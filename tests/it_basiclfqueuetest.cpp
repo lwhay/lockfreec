@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 #include <pthread.h>
+#include <cstddef>
 #include <sys/time.h>
 #include "moody/basiclockfreequeue.h"
 
