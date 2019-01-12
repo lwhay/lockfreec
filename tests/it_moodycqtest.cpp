@@ -78,7 +78,7 @@ void *simpleWorker(void *args) {
 #if USE_MOODY_TOKEN
         psp->q->enqueue(token, i);
 #else
-        cq[nid].enqueue(i);
+        psp->q->enqueue(i);
 #endif
         counter++;
     }
