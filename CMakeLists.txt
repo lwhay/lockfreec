@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.6)
 project(lockfreec)
 enable_language(CXX)
 enable_language(C)
@@ -66,10 +66,15 @@ endif ()
 
 option(WITH_MWLF_TESTS "build with multiword lftests" ON)
 if (WITH_MWLF_TESTS)
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    set(MWLF_TEST
+            tests/it_moodycqtest.cpp)
+else ()
     set(MWLF_TEST
             tests/it_mwcastest.cpp
             tests/mwctests/utebrtest.cpp
             tests/it_moodycqtest.cpp)
+endif ()
 endif ()
 
 find_package(Threads)
@@ -111,7 +116,7 @@ foreach (sourcefile ${LF_TESTS_EXES})
             EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
             OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
             )
-    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} PTHREAD)
+    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD})
 endforeach (sourcefile ${LF_TESTS_EXES})
 
 set(MWLF_TESTS_EXES ${MWLF_TEST})
@@ -154,5 +159,5 @@ foreach (sourcefile ${FOSTER_TESTS_EXES})
             EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
             OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
             )
-    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} PTHREAD)
+    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD})
 endforeach (sourcefile ${FOSTER_TESTS_EXES})
