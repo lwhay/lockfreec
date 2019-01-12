@@ -73,7 +73,8 @@ if (WITH_MWLF_TESTS)
         set(MWLF_TEST
                 tests/it_mwcastest.cpp
                 tests/mwctests/utebrtest.cpp
-                tests/it_moodycqtest.cpp)
+                tests/it_moodycqtest.cpp
+                tests/it_basiclfqueuetest.cpp)
     endif ()
 endif ()
 
