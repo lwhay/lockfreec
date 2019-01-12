@@ -68,7 +68,8 @@ option(WITH_MWLF_TESTS "build with multiword lftests" ON)
 if (WITH_MWLF_TESTS)
     if (CMAKE_SYSTEM_NAME MATCHES "Linux")
         set(MWLF_TEST
-                tests/it_moodycqtest.cpp)
+                tests/it_moodycqtest.cpp
+                tests/it_basiclfqueuetest.cpp)
     else ()
         set(MWLF_TEST
                 tests/it_mwcastest.cpp
