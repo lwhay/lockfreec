@@ -43,6 +43,7 @@ struct MallocTrackingTraits : public ConcurrentQueueDefaultTraits {
 
 #define MAX_PUSH_COUNT (1 << 28)
 #define MAX_THREAD_NUM 40
+#define USE_MOODY_TOKEN 1
 
 void simpleTest() {
     ConcurrentQueue<int, MallocTrackingTraits> q;
@@ -55,18 +56,30 @@ void simpleTest() {
     std::cout << ((end.tv_sec - begin.tv_sec) * 1000000 + end.tv_usec - begin.tv_usec) << std::endl;
 }
 
-ConcurrentQueue<int, MallocTrackingTraits> *cq;
-
 std::stringstream *output;
 
+struct param_struct {
+    int tid;
+    int nid;
+    ConcurrentQueue<int, MallocTrackingTraits> *q;
+};
+
 void *simpleWorker(void *args) {
-    int tid = ((int *) args)[0];
-    int nid = ((int *) args)[1];
+    struct param_struct *psp = (struct param_struct *) args;
+    int tid = psp->tid;
+    int nid = psp->nid;
     struct timeval begin;
+#if USE_MOODY_TOKEN
+    ProducerToken token(*psp->q);
+#endif
     gettimeofday(&begin, nullptr);
     unsigned long counter = 0;
     for (int i = 0; i < MAX_PUSH_COUNT / nid; i++) {
+#if USE_MOODY_TOKEN
+        psp->q->enqueue(token, i);
+#else
         cq[nid].enqueue(i);
+#endif
         counter++;
     }
     struct timeval end;
@@ -75,25 +88,26 @@ void *simpleWorker(void *args) {
                 << counter;
 }
 
-void concurrentTest(int tnum) {
-    output = new std::stringstream[tnum];
-    int **tids = new int *[tnum];
-    pthread_t *threads = new pthread_t[tnum];
+void concurrentTest(struct param_struct &ps) {
+    output = new std::stringstream[ps.nid];
+    struct param_struct *pds = new struct param_struct[ps.nid];
+    pthread_t *threads = new pthread_t[ps.nid];
     struct timeval begin;
+    for (int i = 0; i < ps.nid; i++) {
+        pds[i].nid = ps.nid;
+        pds[i].tid = i;
+        pds[i].q = ps.q;
+    }
     gettimeofday(&begin, nullptr);
 
-    for (int i = 0; i < tnum; i++) {
-        tids[i] = new int[2];
-        tids[i][0] = i;
-        tids[i][1] = tnum;
-        pthread_create(&threads[i], nullptr, simpleWorker, tids[i]);
+    for (int i = 0; i < ps.nid; i++) {
+        pthread_create(&threads[i], nullptr, simpleWorker, &pds[i]);
     }
 
-    for (int i = 0; i < tnum; i++) {
+    for (int i = 0; i < ps.nid; i++) {
         pthread_join(threads[i], nullptr);
         std::string outstr = output[i].str();
         std::cout << outstr << std::endl;
-        delete[] tids[i];
     }
 
     struct timeval end;
@@ -104,20 +118,22 @@ void concurrentTest(int tnum) {
 }
 
 int main(int argc, char **argv) {
-    cq = new ConcurrentQueue<int, MallocTrackingTraits>[MAX_THREAD_NUM];
     for (int t = 1; t <= MAX_THREAD_NUM; t++) {
-        concurrentTest(t);
+        ConcurrentQueue<int, MallocTrackingTraits> q;
+        struct param_struct ps;
+        ps.q = &q;
+        ps.nid = t;
+        concurrentTest(ps);
         int v;
         int counter = 0;
         struct timeval begin;
         gettimeofday(&begin, nullptr);
-        unsigned long long prevsize = cq[t].size_approx();
-        while (cq[t].try_dequeue(v)) counter++;
+        unsigned long long prevsize = ps.q->size_approx();
+        while (ps.q->try_dequeue(v)) counter++;
         struct timeval end;
         gettimeofday(&end, nullptr);
-        std::cout << t << " " << prevsize << " " << counter << " " << cq[t].size_approx() << " "
+        std::cout << t << " " << prevsize << " " << counter << " " << ps.q->size_approx() << " "
                   << ((end.tv_sec - begin.tv_sec) * 1000000 + end.tv_usec - begin.tv_usec) << std::endl;
     }
-    delete cq;
     return 0;
 }
