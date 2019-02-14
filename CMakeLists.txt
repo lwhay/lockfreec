@@ -17,6 +17,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 include_directories(.)
 include_directories(advance)
+include_directories(advance/hashfunc)
 include_directories(basic)
 include_directories(cases)
 include_directories(mwcas)
@@ -56,6 +57,12 @@ set(MWLF_LIBS
         mwcas/ebr.h mwcas/gc.h)
 
 enable_testing()
+option(WITH_UNIT_TESTS "build with unittest" ON)
+if (WITH_UNIT_TESTS)
+    set(UNIT_TEST
+            tests/unittests/basic_hashtest.c)
+endif ()
+
 option(WITH_LF_TESTS "build with lftests" ON)
 if (WITH_LF_TESTS)
     set(LF_TEST
@@ -107,6 +114,19 @@ if (WITH_FOSTER_TESTS)
             sandbox/btree2sBulkInsert.c
             )
 endif ()
+
+set(UNIT_TESTS_EXES ${UNIT_TEST})
+foreach (sourcefile ${UNIT_TESTS_EXES})
+    get_filename_component(exename ${sourcefile} NAME_WE)
+    add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile})
+    set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
+            PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
+            EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
+            EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
+            OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
+            )
+    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD})
+endforeach (sourcefile ${UNIT_TESTS_EXES})
 
 set(LF_TESTS_EXES ${LF_TEST})
 foreach (sourcefile ${LF_TESTS_EXES})
