@@ -6,7 +6,9 @@
 #define LOCKFREEC_BASIC_HASHFUNC_H
 
 #ifdef linux
+
 #include <stdint.h>
+
 #endif
 
 #include <sys/types.h>
@@ -20,9 +22,9 @@ uint32_t __hash_func(const void *key, uint32_t len) {
 
     k = (uint8_t *) key;
     e = k + len;
-    for (h = 0; h != e;) {
+    for (h = 0; k != e;) {
         c = *k++;
-        if (!c && k > c) {
+        if (!c && k > e) {
             break;
         }
         DCHARHASH(h, c);
