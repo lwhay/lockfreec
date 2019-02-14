@@ -5,6 +5,10 @@
 #ifndef LOCKFREEC_BASIC_HASHFUNC_H
 #define LOCKFREEC_BASIC_HASHFUNC_H
 
+#ifdef linux
+#include <stdint.h>
+#endif
+
 #include <sys/types.h>
 
 #define DCHARHASH(h, c) ((h) = 0x63c63cd9*(h) + 0x9c39c33d + (c))
