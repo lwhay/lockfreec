@@ -54,13 +54,16 @@ set(MWLF_LIBS
         mwcas/rel_ptr.h
         mwcas/pseudoio.h
         mwcas/mmwcas.h
-        mwcas/ebr.h mwcas/gc.h)
+        mwcas/ebr.h
+        mwcas/gc.h)
 
 enable_testing()
 option(WITH_UNIT_TESTS "build with unittest" ON)
 if (WITH_UNIT_TESTS)
     set(UNIT_TEST
-            tests/unittests/basic_hashtest.c)
+            tests/unittests/basic_hashtest.c
+            tests/unittests/bloom_bitsettest.c
+            tests/unittests/bloom_hashtest.c)
 endif ()
 
 option(WITH_LF_TESTS "build with lftests" ON)
