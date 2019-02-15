@@ -10,11 +10,14 @@
 //char *rdfFilePath = "d:/trie_data/dbpedia_all.nt";
 char *rdfFilePath = "d:/trie_data/University_rand_longstr.nt";
 #define TOTAL_NUMBER (1 << 25)
-#define BUCKET_NUMBER 64
+#define BUCKET_NUMBER (1 << 16)
 
 void testInt64() {
     int counters[BUCKET_NUMBER];
     memset(counters, 0, BUCKET_NUMBER * sizeof(int));
+    struct timeval tick;
+    gettimeofday(&tick, NULL);
+    srand(tick.tv_usec);
     int rint = rand();
     printf("%d\n", rint);
     struct timeval begin;
@@ -74,7 +77,7 @@ void testRDFString() {
     uint64_t total = 0;
     for (int i = 0; i < BUCKET_NUMBER; i++) {
         total += counters[i];
-        printf("%d\t", counters[i]);
+        printf("%6d\t", counters[i]);
         if ((i + 1) % 32 == 0) {
             printf("\n");
         }
