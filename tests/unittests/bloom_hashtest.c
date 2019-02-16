@@ -12,6 +12,7 @@
 #define TOTAL_SETS (1LLU << 24)
 #define ERROR_RATE (0.01)
 #define THREAD_NUM (1)
+#define CONCURRENT (0)
 
 struct args_struct {
     bloom_t *bh;
@@ -40,9 +41,15 @@ void *getworker(void *args) {
 
 void thread_bloomhash() {
     struct args_struct *args = malloc(sizeof(struct args_struct) * THREAD_NUM);
+#if CONCURRENT
     bloom_t *bh = bloom_create(TOTAL_BITS, ERROR_RATE);
+#endif
     for (int k = 0; k < THREAD_NUM; k++) {
+#if CONCURRENT
         args[k].bh = bh;
+#else
+        args[k].bh = bloom_create(TOTAL_BITS, ERROR_RATE);
+#endif
         args[k].bits = malloc(sizeof(size_t) * TOTAL_SETS);
         for (int i = 0; i < TOTAL_SETS; i++) {
             args->bits[i] = TOTAL_BITS / TOTAL_SETS * i + k;
@@ -70,10 +77,12 @@ void thread_bloomhash() {
         false_negatives += args[i].false_negatives;
     }
     size_t false_positives = 0;
-    for (int i = 0; i < TOTAL_SETS; i++) {
-        size_t positives = TOTAL_BITS + i;
-        if (bloom_get(bh, (unsigned char *) &positives, sizeof(size_t))) {
-            false_positives++;
+    for (int k = 0; k < THREAD_NUM; k++) {
+        for (int i = 0; i < TOTAL_SETS; i++) {
+            size_t positives = TOTAL_BITS + i;
+            if (bloom_get(args[k].bh, (unsigned char *) &positives, sizeof(size_t))) {
+                false_positives++;
+            }
         }
     }
     printf("%llu, %llu, %llu, %llu, %f, %d\n", TOTAL_BITS, TOTAL_SETS, false_positives, false_negatives,

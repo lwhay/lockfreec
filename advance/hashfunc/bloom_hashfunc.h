@@ -6,12 +6,17 @@
 #define LOCKFREEC_BLOOM_HASHFUNC_H
 
 #include <stdlib.h>
-#include <stdatomic.h>
 #include <limits.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <math.h>
+
+#if (__GNUC__ > 4)
+
+#include <stdatomic.h>
+
+#endif
 
 #define INT_BIT (sizeof(_Atomic(int)) * CHAR_BIT)
 
@@ -57,22 +62,39 @@ static void bv_destroy(bitvector_t *bv) {
 
 static void bv_set(bitvector_t *bv, size_t k) {
     BV_BOUND_CHECK(bv->size, k);
+#if (__GNUC__ > 4)
     atomic_fetch_or(&(bv->field[k / INT_BIT]), 1 << (k % INT_BIT));
+#else
+    __sync_fetch_and_or(&(bv->field[k / INT_BIT]), 1 << (k % INT_BIT));
+#endif
 }
 
 static void bv_unset(bitvector_t *bv, size_t k) {
     BV_BOUND_CHECK(bv->size, k);
+#if (__GNUC__ > 4)
     atomic_fetch_and(&(bv->field[k / INT_BIT]), ~(1 << (k % INT_BIT)));
+#else
+    __sync_fetch_and_and(&(bv->field[k / INT_BIT]), ~(1 << (k % INT_BIT)));
+#endif
 }
 
 static void bv_toggle(bitvector_t *bv, size_t k) {
     BV_BOUND_CHECK(bv->size, k);
+#if (__GNUC__ > 4)
     atomic_fetch_xor(&(bv->field[k / INT_BIT]), 1 << (k % INT_BIT));
+#else
+    __sync_fetch_and_xor(&(bv->field[k / INT_BIT]), 1 << (k % INT_BIT));
+#endif
 }
 
 static int bv_get(bitvector_t *bv, size_t k) {
     BV_BOUND_CHECK(bv->size, k);
+#if (__GNUC__ > 4)
     return ((atomic_load(&(bv->field[k / INT_BIT])) & (1 << (k % INT_BIT))) != 0);
+#else
+    __sync_synchronize();
+    return (((bv->field[k / INT_BIT] & (1 << (k % INT_BIT)))) != 0);
+#endif
 }
 
 // murmur3 hash
@@ -235,9 +257,6 @@ void MurmurHash3_x86_128(const void *key, const int len, uint32_t seed, void *ou
         h4 += h1;
         h4 = h4 * 5 + 0x32ac3b17;
     }
-
-    //----------
-    // tail
 
     const uint8_t *tail = (const uint8_t *) (data + nblocks * 16);
 
@@ -513,7 +532,11 @@ int bloom_add(bloom_t *bloom, const char *key, size_t key_len) {
     }
     free(hashes);
     if (!seen)
+#if __GNUC__ > 4
         atomic_fetch_add_explicit(&(bloom->nitems), 1, memory_order_relaxed);
+#else
+    __sync_fetch_and(&(bloom->nitems), 1);
+#endif
     return seen;
 }
 
