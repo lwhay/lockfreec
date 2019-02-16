@@ -12,8 +12,12 @@
 #include <stdint.h>
 #include <math.h>
 
-#if (__GNUC__ > 4)
+#define MIN_ATOMIC_GCC_VERSION 7
+
+#if (__GNUC__ > MIN_ATOMIC_GCC_VERSION)
+
 #include <stdatomic.h>
+
 #define INT_BIT (sizeof(_Atomic(int)) * CHAR_BIT)
 #else
 #define INT_BIT (sizeof(int) * CHAR_BIT)
@@ -27,7 +31,7 @@
 #endif
 
 typedef struct BitVector {
-#if (__GNUC__ > 4)
+#if (__GNUC__ > MIN_ATOMIC_GCC_VERSION)
     _Atomic int *field;
 #else
     int *field;
@@ -38,7 +42,7 @@ typedef struct BitVector {
 static int bv_init(bitvector_t *bv, size_t k) {
     bv->size = k;
     size_t ints = (k + (INT_BIT - 1)) / INT_BIT;
-#if (__GNUC__ > 4)
+#if (__GNUC__ > MIN_ATOMIC_GCC_VERSION)
     bv->field = calloc(ints, sizeof(_Atomic (int)));
 #else
     bv->field = calloc(ints, sizeof(int));
@@ -70,7 +74,7 @@ static void bv_destroy(bitvector_t *bv) {
 
 static void bv_set(bitvector_t *bv, size_t k) {
     BV_BOUND_CHECK(bv->size, k);
-#if (__GNUC__ > 4)
+#if (__GNUC__ > MIN_ATOMIC_GCC_VERSION)
     atomic_fetch_or(&(bv->field[k / INT_BIT]), 1 << (k % INT_BIT));
 #else
     __sync_fetch_and_or(&(bv->field[k / INT_BIT]), 1 << (k % INT_BIT));
@@ -79,7 +83,7 @@ static void bv_set(bitvector_t *bv, size_t k) {
 
 static void bv_unset(bitvector_t *bv, size_t k) {
     BV_BOUND_CHECK(bv->size, k);
-#if (__GNUC__ > 4)
+#if (__GNUC__ > MIN_ATOMIC_GCC_VERSION)
     atomic_fetch_and(&(bv->field[k / INT_BIT]), ~(1 << (k % INT_BIT)));
 #else
     __sync_fetch_and_and(&(bv->field[k / INT_BIT]), ~(1 << (k % INT_BIT)));
@@ -88,7 +92,7 @@ static void bv_unset(bitvector_t *bv, size_t k) {
 
 static void bv_toggle(bitvector_t *bv, size_t k) {
     BV_BOUND_CHECK(bv->size, k);
-#if (__GNUC__ > 4)
+#if (__GNUC__ > MIN_ATOMIC_GCC_VERSION)
     atomic_fetch_xor(&(bv->field[k / INT_BIT]), 1 << (k % INT_BIT));
 #else
     __sync_fetch_and_xor(&(bv->field[k / INT_BIT]), 1 << (k % INT_BIT));
@@ -97,7 +101,7 @@ static void bv_toggle(bitvector_t *bv, size_t k) {
 
 static int bv_get(bitvector_t *bv, size_t k) {
     BV_BOUND_CHECK(bv->size, k);
-#if (__GNUC__ > 4)
+#if (__GNUC__ > MIN_ATOMIC_GCC_VERSION)
     return ((atomic_load(&(bv->field[k / INT_BIT])) & (1 << (k % INT_BIT))) != 0);
 #else
     __sync_synchronize();
@@ -474,7 +478,7 @@ typedef struct {
     size_t capacity;
     size_t nhashes;
     double error_rate;
-#if (__GNUC__ > 4)
+#if (__GNUC__ > MIN_ATOMIC_GCC_VERSION)
     _Atomic size_t nitems;
 #else
     size_t nitems;
@@ -544,10 +548,10 @@ int bloom_add(bloom_t *bloom, const char *key, size_t key_len) {
     }
     free(hashes);
     if (!seen)
-#if __GNUC__ > 4
+#if (__GNUC__ > MIN_ATOMIC_GCC_VERSION)
         atomic_fetch_add_explicit(&(bloom->nitems), 1, memory_order_relaxed);
 #else
-    __sync_fetch_and(&(bloom->nitems), 1);
+        __sync_fetch_and_add(&(bloom->nitems), 1);
 #endif
     return seen;
 }
