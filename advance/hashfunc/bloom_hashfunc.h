@@ -13,12 +13,12 @@
 #include <math.h>
 
 #if (__GNUC__ > 4)
-
 #include <stdatomic.h>
-
+#define INT_BIT (sizeof(_Atomic(int)) * CHAR_BIT)
+#else
+#define INT_BIT (sizeof(int) * CHAR_BIT)
 #endif
 
-#define INT_BIT (sizeof(_Atomic(int)) * CHAR_BIT)
 
 #ifndef NDEBUG
 #define BV_BOUND_CHECK(size, idx) assert(idx < size)
@@ -27,14 +27,22 @@
 #endif
 
 typedef struct BitVector {
+#if (__GNUC__ > 4)
     _Atomic int *field;
+#else
+    int *field;
+#endif
     size_t size;
 } bitvector_t;
 
 static int bv_init(bitvector_t *bv, size_t k) {
     bv->size = k;
     size_t ints = (k + (INT_BIT - 1)) / INT_BIT;
+#if (__GNUC__ > 4)
     bv->field = calloc(ints, sizeof(_Atomic (int)));
+#else
+    bv->field = calloc(ints, sizeof(int));
+#endif
     if (bv->field == NULL) {
         return -1;
     }
@@ -466,7 +474,11 @@ typedef struct {
     size_t capacity;
     size_t nhashes;
     double error_rate;
+#if (__GNUC__ > 4)
     _Atomic size_t nitems;
+#else
+    size_t nitems;
+#endif
     size_t size;
     bitvector_t *bitvector;
 } bloom_t;
