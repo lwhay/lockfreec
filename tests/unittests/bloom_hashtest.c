@@ -11,10 +11,14 @@
 #define TOTAL_BITS (1LLU << 24)
 #define TOTAL_SETS (1LLU << 24)
 #define ERROR_RATE (0.01)
-#define THREAD_NUM (1)
+#define THREAD_NUM (4)
 #define CONCURRENT (0)
+#define STATICHASH (1)
 
 struct args_struct {
+#if STATICHASH
+    size_t *hc;
+#endif
     bloom_t *bh;
     size_t *bits;
     size_t false_negatives;
@@ -26,14 +30,28 @@ void *setworker(void *args) {
         if (i % (1 << 20) == 0) {
             printf("%llu\t%llu\n", i / (1 << 20), i);
         }
+#if STATICHASH
+        for (int j = 0; j < as->bh->nhashes; j++) {
+            as->hc[j] = 0;
+        }
+        bloom_attach(as->bh, (unsigned char *) &((as->bits[i])), sizeof(size_t), as->hc);
+#else
         bloom_add(as->bh, (unsigned char *) &((as->bits[i])), sizeof(size_t));
+#endif
     }
 }
 
 void *getworker(void *args) {
     struct args_struct *as = (struct args_struct *) args;
     for (int i = 0; i < TOTAL_SETS; i++) {
-        if (!bloom_get(as->bh, (unsigned char *) &((as->bits[i])), sizeof(size_t))) {
+#if STATICHASH
+        for (int j = 0; j < as->bh->nhashes; j++) {
+            as->hc[j] = 0;
+        }
+        if (!bloom_obtain(as->bh, (unsigned char *) &((as->bits[i])), sizeof(size_t), as->hc)) {
+#else
+            if (!bloom_get(as->bh, (unsigned char *) &((as->bits[i])), sizeof(size_t))) {
+#endif
             as->false_negatives++;
         }
     }
@@ -49,6 +67,9 @@ void thread_bloomhash() {
         args[k].bh = bh;
 #else
         args[k].bh = bloom_create(TOTAL_BITS, ERROR_RATE);
+#if STATICHASH
+        args[k].hc = calloc(args[k].bh->nhashes, sizeof(size_t));
+#endif
 #endif
         args[k].bits = malloc(sizeof(size_t) * TOTAL_SETS);
         for (int i = 0; i < TOTAL_SETS; i++) {
@@ -80,16 +101,30 @@ void thread_bloomhash() {
     for (int k = 0; k < THREAD_NUM; k++) {
         for (int i = 0; i < TOTAL_SETS; i++) {
             size_t positives = TOTAL_BITS + i;
-            if (bloom_get(args[k].bh, (unsigned char *) &positives, sizeof(size_t))) {
+#if STATICHASH
+            for (int j = 0; j < args[k].bh->nhashes; j++) {
+                args[k].hc[j] = 0;
+            }
+            if (bloom_obtain(args[k].bh, (unsigned char *) &positives, sizeof(size_t), args[k].hc)) {
+#else
+                if (bloom_get(args[k].bh, (unsigned char *) &positives, sizeof(size_t))) {
+#endif
                 false_positives++;
             }
         }
+#if STATICHASH
+        bloom_destroy(args[k].bh);
+        free(args[k].hc);
+        free(args[k].bits);
+#endif
     }
     printf("%llu, %llu, %llu, %llu, %f, %d\n", TOTAL_BITS, TOTAL_SETS, false_positives, false_negatives,
-           (double) false_positives / TOTAL_SETS,
+           (double) false_positives / (TOTAL_SETS * THREAD_NUM),
            ((end.tv_sec - begin.tv_sec) * 1000000 + end.tv_usec - begin.tv_usec));
+#if !(STATICHASH)
     bloom_destroy(args->bh);
     free(args->bits);
+#endif
     free(args);
 }
 

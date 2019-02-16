@@ -533,6 +533,27 @@ bloom_t *bloom_create(size_t capacity, double error_rate) {
     return bloom;
 }
 
+int bloom_attach(bloom_t *bloom, const char *key, size_t key_len, size_t *hashes) {
+    if (hashes == NULL)
+        return -1;
+    gen_hashes(key, key_len, hashes, bloom->nhashes, bloom->size);
+    int seen = 1;        /* andable values for seeing if the value was already set */
+    size_t i;
+    for (i = 0; i < bloom->nhashes; ++i) {
+        int cval = bv_get(bloom->bitvector, hashes[i]);
+        seen &= cval;
+        if (!cval)
+            bv_set(bloom->bitvector, hashes[i]);
+    }
+    if (!seen)
+#if (__GNUC__ > MIN_ATOMIC_GCC_VERSION)
+        atomic_fetch_add_explicit(&(bloom->nitems), 1, memory_order_relaxed);
+#else
+        __sync_fetch_and_add(&(bloom->nitems), 1);
+#endif
+    return seen;
+}
+
 int bloom_add(bloom_t *bloom, const char *key, size_t key_len) {
     size_t *hashes = calloc(bloom->nhashes, sizeof(size_t));
     if (hashes == NULL)
@@ -554,6 +575,17 @@ int bloom_add(bloom_t *bloom, const char *key, size_t key_len) {
         __sync_fetch_and_add(&(bloom->nitems), 1);
 #endif
     return seen;
+}
+
+int bloom_obtain(bloom_t *bloom, const char *key, size_t key_len, size_t *hashes) {
+    gen_hashes(key, key_len, hashes, bloom->nhashes, bloom->size);
+    size_t i;
+    for (i = 0; i < bloom->nhashes; ++i) {
+        if (!bv_get(bloom->bitvector, hashes[i])) {
+            return 0;
+        }
+    }
+    return 1;
 }
 
 int bloom_get(bloom_t *bloom, const char *key, size_t key_len) {
