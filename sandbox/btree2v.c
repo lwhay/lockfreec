@@ -27,14 +27,24 @@ REDISTRIBUTION OF THIS SOFTWARE.
 
 #ifdef linux
 #define _GNU_SOURCE
-
+#ifndef __APPLE__
 #include <linux/futex.h>
+#endif
+
 #include <limits.h>
 
 #define SYS_futex 202
 #endif
 
+#ifdef __APPLE__
+#define unix
+typedef unsigned long long off64_t;
+typedef unsigned short ushort;
+typedef unsigned int uint;
+#endif
+
 #ifdef unix
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,6 +52,7 @@ REDISTRIBUTION OF THIS SOFTWARE.
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <errno.h>
+
 #else
 #define WIN32_LEAN_AND_MEAN
 
@@ -474,8 +485,8 @@ BTERR bt_readpage(BtDb *bt, BtPage page, uid page_no) {
     off64_t off = page_no << bt->page_bits;
 
 #ifdef unix
-    if( pread (bt->idx, page, bt->page_size, page_no << bt->page_bits) < bt->page_size ) {
-        fprintf (stderr, "Unable to read page %.8x errno = %d\n", page_no, errno);
+    if (pread(bt->idx, page, bt->page_size, page_no << bt->page_bits) < bt->page_size) {
+        fprintf(stderr, "Unable to read page %.8x errno = %d\n", page_no, errno);
         return bt->err = BTERR_read;
     }
 #else
@@ -507,7 +518,7 @@ BTERR bt_writepage(BtDb *bt, BtPage page, uid page_no) {
 #ifdef unix
     page->dirty = 0;
 
-    if( pwrite(bt->idx, page, bt->page_size, off) < bt->page_size )
+    if (pwrite(bt->idx, page, bt->page_size, off) < bt->page_size)
         return bt->err = BTERR_wrt;
 #else
     OVERLAPPED ovl[1];
@@ -552,7 +563,7 @@ BTERR bt_latchlink(BtDb *bt, uint hashidx, uint slot, uid page_no) {
     latch->pin |= lvl << 3; // initialize clock
 
 #ifdef unix
-    __sync_fetch_and_add (&bt->latchmgr->cache[page->lvl], 1);
+    __sync_fetch_and_add(&bt->latchmgr->cache[page->lvl], 1);
 #else
     _InterlockedAdd(&bt->latchmgr->cache[page->lvl], 1);
 #endif
@@ -614,7 +625,7 @@ BtLatchSet *bt_pinlatch(BtDb *bt, uid page_no) {
 
     //  see if there are any unused pool entries
 #ifdef unix
-    slot = __sync_fetch_and_add (&bt->latchmgr->latchdeployed, 1) + 1;
+    slot = __sync_fetch_and_add(&bt->latchmgr->latchdeployed, 1) + 1;
 #else
     slot = _InterlockedIncrement(&bt->latchmgr->latchdeployed);
 #endif
@@ -628,7 +639,7 @@ BtLatchSet *bt_pinlatch(BtDb *bt, uid page_no) {
     }
 
 #ifdef unix
-    __sync_fetch_and_add (&bt->latchmgr->latchdeployed, -1);
+    __sync_fetch_and_add(&bt->latchmgr->latchdeployed, -1);
 #else
     _InterlockedDecrement(&bt->latchmgr->latchdeployed);
 #endif
@@ -656,7 +667,7 @@ BtLatchSet *bt_pinlatch(BtDb *bt, uid page_no) {
 #ifdef unix
                 __sync_fetch_and_add(&bt->latchmgr->safelevel, 1);
 #else
-                _InterlockedIncrement(&bt->latchmgr->safelevel);
+            _InterlockedIncrement(&bt->latchmgr->safelevel);
 #endif
             continue;
         }
@@ -679,7 +690,7 @@ BtLatchSet *bt_pinlatch(BtDb *bt, uid page_no) {
 #ifdef unix
                 __sync_fetch_and_add(&latch->pin, -CLOCK_unit);
 #else
-                _InterlockedExchangeAdd16(&latch->pin, -CLOCK_unit);
+            _InterlockedExchangeAdd16(&latch->pin, -CLOCK_unit);
 #endif
             bt->table[idx].busy[0] = 0;
             continue;
@@ -689,8 +700,8 @@ BtLatchSet *bt_pinlatch(BtDb *bt, uid page_no) {
 
         page = (BtPage) ((uid) slot * bt->page_size + bt->pagepool);
 #ifdef unix
-        posix_fadvise (bt->idx, page_no << bt->page_bits, bt->page_size, POSIX_FADV_WILLNEED);
-        __sync_fetch_and_add (&bt->latchmgr->cache[page->lvl], -1);
+        posix_fadvise(bt->idx, page_no << bt->page_bits, bt->page_size, POSIX_FADV_WILLNEED);
+        __sync_fetch_and_add(&bt->latchmgr->cache[page->lvl], -1);
 #else
         _InterlockedAdd(&bt->latchmgr->cache[page->lvl], -1);
 #endif
@@ -722,18 +733,18 @@ BtLatchSet *bt_pinlatch(BtDb *bt, uid page_no) {
 
 void bt_close(BtDb *bt) {
 #ifdef unix
-    munmap (bt->table, bt->latchmgr->nlatchpage * bt->page_size);
-    munmap (bt->latchmgr, bt->page_size);
+    munmap(bt->table, bt->latchmgr->nlatchpage * bt->page_size);
+    munmap(bt->latchmgr, bt->page_size);
 #else
     FlushViewOfFile(bt->latchmgr, 0);
     UnmapViewOfFile(bt->latchmgr);
     CloseHandle(bt->halloc);
 #endif
 #ifdef unix
-    if( bt->mem )
-        free (bt->mem);
-    close (bt->idx);
-    free (bt);
+    if (bt->mem)
+        free(bt->mem);
+    close(bt->idx);
+    free(bt);
 #else
     if (bt->mem)
         VirtualFree(bt->mem, 0, MEM_RELEASE);
@@ -775,34 +786,34 @@ BtDb *bt_open(char *name, uint mode, uint bits, uint nodemax) {
         return NULL;
     }
 #ifdef unix
-    bt = calloc (1, sizeof(BtDb));
+    bt = calloc(1, sizeof(BtDb));
 
-    bt->idx = open ((char*)name, O_RDWR | O_CREAT, 0666);
-    posix_fadvise( bt->idx, 0, 0, POSIX_FADV_RANDOM);
+    bt->idx = open((char *) name, O_RDWR | O_CREAT, 0666);
+    posix_fadvise(bt->idx, 0, 0, POSIX_FADV_RANDOM);
 
-    if( bt->idx == -1 ) {
+    if (bt->idx == -1) {
         fprintf(stderr, "unable to open %s\n", name);
         return free(bt), NULL;
     }
 #else
-    bt = GlobalAlloc(GMEM_FIXED | GMEM_ZEROINIT, sizeof(BtDb));
-    attr = FILE_ATTRIBUTE_NORMAL;
-    bt->idx = CreateFile(name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS,
-                         attr, NULL);
+        bt = GlobalAlloc(GMEM_FIXED | GMEM_ZEROINIT, sizeof(BtDb));
+        attr = FILE_ATTRIBUTE_NORMAL;
+        bt->idx = CreateFile(name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS,
+                             attr, NULL);
 
-    if (bt->idx == INVALID_HANDLE_VALUE) {
-        fprintf(stderr, "unable to open %s\n", name);
-        return GlobalFree(bt), NULL;
-    }
+        if (bt->idx == INVALID_HANDLE_VALUE) {
+            fprintf(stderr, "unable to open %s\n", name);
+            return GlobalFree(bt), NULL;
+        }
 #endif
 #ifdef unix
     memset (lock, 0, sizeof(lock));
     lock->l_len = sizeof(struct BtPage_);
     lock->l_type = F_WRLCK;
 
-    if( fcntl (bt->idx, F_SETLKW, lock) < 0 ) {
+    if (fcntl(bt->idx, F_SETLKW, lock) < 0) {
         fprintf(stderr, "unable to lock record zero %s\n", name);
-        return bt_close (bt), NULL;
+        return bt_close(bt), NULL;
     }
 #else
     memset(ovl, 0, sizeof(ovl));
@@ -819,13 +830,13 @@ BtDb *bt_open(char *name, uint mode, uint bits, uint nodemax) {
 #endif
 
 #ifdef unix
-    latchmgr = valloc (BT_maxpage);
+    latchmgr = valloc(BT_maxpage);
     *amt = 0;
 
     // read minimum page size to get root info
 
-    if( size = lseek (bt->idx, 0L, 2) ) {
-        if( pread(bt->idx, latchmgr, BT_minpage, 0) == BT_minpage )
+    if (size = lseek(bt->idx, 0L, 2)) {
+        if (pread(bt->idx, latchmgr, BT_minpage, 0) == BT_minpage)
             bits = latchmgr->alloc->bits;
         else {
             fprintf(stderr, "Unable to read page zero\n");
@@ -918,7 +929,7 @@ BtDb *bt_open(char *name, uint mode, uint bits, uint nodemax) {
     }
 
 #ifdef unix
-    free (latchmgr);
+    free(latchmgr);
 #else
     VirtualFree(latchmgr, 0, MEM_RELEASE);
 #endif
@@ -926,9 +937,9 @@ BtDb *bt_open(char *name, uint mode, uint bits, uint nodemax) {
     btlatch:
 #ifdef unix
     lock->l_type = F_UNLCK;
-    if( fcntl (bt->idx, F_SETLK, lock) < 0 ) {
-        fprintf (stderr, "Unable to unlock page zero\n");
-        return bt_close (bt), NULL;
+    if (fcntl(bt->idx, F_SETLK, lock) < 0) {
+        fprintf(stderr, "Unable to unlock page zero\n");
+        return bt_close(bt), NULL;
     }
 #else
     if (!UnlockFileEx(bt->idx, 0, sizeof(struct BtPage_), 0, ovl)) {
@@ -938,17 +949,18 @@ BtDb *bt_open(char *name, uint mode, uint bits, uint nodemax) {
 #endif
 #ifdef unix
     flag = PROT_READ | PROT_WRITE;
-    bt->latchmgr = mmap (0, bt->page_size, flag, MAP_SHARED, bt->idx, ALLOC_page * bt->page_size);
-    if( bt->latchmgr == MAP_FAILED ) {
-        fprintf (stderr, "Unable to mmap page zero, errno = %d", errno);
-        return bt_close (bt), NULL;
+    bt->latchmgr = mmap(0, bt->page_size, flag, MAP_SHARED, bt->idx, ALLOC_page * bt->page_size);
+    if (bt->latchmgr == MAP_FAILED) {
+        fprintf(stderr, "Unable to mmap page zero, errno = %d", errno);
+        return bt_close(bt), NULL;
     }
-    bt->table = (void *)mmap (0, (uid)nlatchpage * bt->page_size, flag, MAP_SHARED, bt->idx, LATCH_page * bt->page_size);
-    if( bt->table == MAP_FAILED ) {
-        fprintf (stderr, "Unable to mmap buffer pool, errno = %d", errno);
-        return bt_close (bt), NULL;
+    bt->table = (void *) mmap(0, (uid) nlatchpage * bt->page_size, flag, MAP_SHARED, bt->idx,
+                              LATCH_page * bt->page_size);
+    if (bt->table == MAP_FAILED) {
+        fprintf(stderr, "Unable to mmap buffer pool, errno = %d", errno);
+        return bt_close(bt), NULL;
     }
-    madvise (bt->table, (uid)nlatchpage << bt->page_bits, MADV_RANDOM | MADV_WILLNEED);
+    madvise(bt->table, (uid) nlatchpage << bt->page_bits, MADV_RANDOM | MADV_WILLNEED);
 #else
     flag = PAGE_READWRITE;
     bt->halloc = CreateFileMapping(bt->idx, NULL, flag, 0, ((uid) nlatchpage + LATCH_page) * bt->page_size, NULL);
@@ -970,7 +982,7 @@ BtDb *bt_open(char *name, uint mode, uint bits, uint nodemax) {
     bt->latchsets = (BtLatchSet *) (bt->pagepool - (uid) bt->latchmgr->latchtotal * sizeof(BtLatchSet));
 
 #ifdef unix
-    bt->mem = valloc (2 * bt->page_size);
+    bt->mem = valloc(2 * bt->page_size);
 #else
     bt->mem = VirtualAlloc(NULL, 2 * bt->page_size, MEM_COMMIT, PAGE_READWRITE);
 #endif
@@ -1087,9 +1099,9 @@ int keycmp(BtKey key1, unsigned char *key2, uint len2) {
 
 void bt_update(BtDb *bt, BtPage page) {
 #ifdef unix
-    msync (page, bt->page_size, MS_ASYNC);
+    msync(page, bt->page_size, MS_ASYNC);
 #else
-//	FlushViewOfFile (page, bt->page_size);
+    //	FlushViewOfFile (page, bt->page_size);
 #endif
     page->dirty = 1;
 }
@@ -1897,7 +1909,7 @@ uint bt_audit(BtDb *bt) {
     BtKey ptr;
 
 #ifdef unix
-    posix_fadvise( bt->idx, 0, 0, POSIX_FADV_SEQUENTIAL);
+    posix_fadvise(bt->idx, 0, 0, POSIX_FADV_SEQUENTIAL);
 #endif
     if (*(ushort *) (bt->latchmgr->lock))
         fprintf(stderr, "Alloc page locked\n");
@@ -2007,30 +2019,31 @@ double getCpuTime(int type) {
 }
 
 #else
+
 #include <time.h>
 #include <sys/resource.h>
 
-double getCpuTime(int type)
-{
-struct rusage used[1];
-struct timeval tv[1];
+double getCpuTime(int type) {
+    struct rusage used[1];
+    struct timeval tv[1];
 
-    switch( type ) {
-    case 0:
-        gettimeofday(tv, NULL);
-        return (double)tv->tv_sec + (double)tv->tv_usec / 1000000;
+    switch (type) {
+        case 0:
+            gettimeofday(tv, NULL);
+            return (double) tv->tv_sec + (double) tv->tv_usec / 1000000;
 
-    case 1:
-        getrusage(RUSAGE_SELF, used);
-        return (double)used->ru_utime.tv_sec + (double)used->ru_utime.tv_usec / 1000000;
+        case 1:
+            getrusage(RUSAGE_SELF, used);
+            return (double) used->ru_utime.tv_sec + (double) used->ru_utime.tv_usec / 1000000;
 
-    case 2:
-        getrusage(RUSAGE_SELF, used);
-        return (double)used->ru_stime.tv_sec + (double)used->ru_stime.tv_usec / 1000000;
+        case 2:
+            getrusage(RUSAGE_SELF, used);
+            return (double) used->ru_stime.tv_sec + (double) used->ru_stime.tv_usec / 1000000;
     }
 
     return 0;
 }
+
 #endif
 
 //  standalone program to index file of keys
@@ -2104,7 +2117,7 @@ int main(int argc, char **argv) {
             fprintf(stderr, "started indexing for %s\n", argv[2]);
             if (argc > 2 && (in = fopen(argv[2], "rb"))) {
 #ifdef unix
-                posix_fadvise( fileno(in), 0, 0, POSIX_FADV_NOREUSE);
+                posix_fadvise(fileno(in), 0, 0, POSIX_FADV_NOREUSE);
 #endif
                 while (ch = getc(in), ch != EOF)
                     if (ch == '\n') {
@@ -2124,7 +2137,7 @@ int main(int argc, char **argv) {
             fprintf(stderr, "started deleting keys for %s\n", argv[2]);
             if (argc > 2 && (in = fopen(argv[2], "rb"))) {
 #ifdef unix
-                posix_fadvise( fileno(in), 0, 0, POSIX_FADV_NOREUSE);
+                posix_fadvise(fileno(in), 0, 0, POSIX_FADV_NOREUSE);
 #endif
                 while (ch = getc(in), ch != EOF)
                     if (ch == '\n') {
@@ -2144,7 +2157,7 @@ int main(int argc, char **argv) {
             fprintf(stderr, "started finding keys for %s\n", argv[2]);
             if (argc > 2 && (in = fopen(argv[2], "rb"))) {
 #ifdef unix
-                posix_fadvise( fileno(in), 0, 0, POSIX_FADV_NOREUSE);
+                posix_fadvise(fileno(in), 0, 0, POSIX_FADV_NOREUSE);
 #endif
                 while (ch = getc(in), ch != EOF)
                     if (ch == '\n') {

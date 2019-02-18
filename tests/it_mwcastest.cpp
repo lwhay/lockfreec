@@ -12,11 +12,11 @@ int main(int argc, char **argv) {
     unsigned long long v3 = 3;
 
 #ifdef linux
-    #include <stdatomic.h>
+#include <stdatomic.h>
     __sync_fetch_and_add(v, 1);
     __sync_val_compare_and_swap(v1, v2, v3);
 #else
-#if defined(__MINGW64__) || defined(__CYGWIN__)
+#if defined(__MINGW64__) || defined(__CYGWIN__) || defined(__APPLE__)
     unsigned long long u = __sync_fetch_and_add(&v, 1);
     printf("%d %d\n", u, v);
     __sync_val_compare_and_swap(&v1, v2, v3);

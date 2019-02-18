@@ -188,7 +188,7 @@ void memtrie_test_internal_search(struct trie_state *ts);
 
 void memtrie_test_internal_insert_and_search();
 
-void memtrie_test_internal_thread_simple_search(void *state);
+thread_return_t CALLING_CONVENTION memtrie_test_internal_thread_simple_search(void *state);
 
 void memtrie_test_internal_rapid_insert_and_search();
 

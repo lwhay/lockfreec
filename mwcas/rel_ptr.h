@@ -9,13 +9,15 @@
 
 #ifndef __MSVC__
 typedef unsigned char uchar;
+#ifndef __APPLE__
 typedef long off_t;
+#endif
 #ifndef __CYGWIN__
 typedef unsigned long long uint64_t;
 #endif
 #endif
 
-#if defined(__MINGW64__) || defined(__CYGWIN__) || defined(linux)
+#if defined(__MINGW64__) || defined(__CYGWIN__) || defined(linux) || defined(__APPLE__)
 #define EXCHANGE                        __sync_fetch_and_add
 #define CAS                             __sync_val_compare_and_swap
 #else

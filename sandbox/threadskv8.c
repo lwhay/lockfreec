@@ -35,7 +35,15 @@ REDISTRIBUTION OF THIS SOFTWARE.
 #define _GNU_SOURCE
 #endif
 
+#ifdef __APPLE__
+#define unix
+typedef unsigned long long off64_t;
+typedef unsigned short ushort;
+typedef unsigned int uint;
+#endif
+
 #ifdef unix
+
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,6 +52,7 @@ REDISTRIBUTION OF THIS SOFTWARE.
 #include <sys/mman.h>
 #include <errno.h>
 #include <pthread.h>
+
 #else
 #define WIN32_LEAN_AND_MEAN
 
@@ -415,7 +424,7 @@ uid bt_getid(unsigned char *src) {
 
 uid bt_newdup(BtDb *bt) {
 #ifdef unix
-    return __sync_fetch_and_add (bt->mgr->pagezero->dups, 1) + 1;
+    return __sync_fetch_and_add(bt->mgr->pagezero->dups, 1) + 1;
 #else
     return InterlockedIncrement64(bt->mgr->pagezero->dups);
 #endif
@@ -465,7 +474,7 @@ void WriteLock(RWLock *lock) {
     ushort w, r, tix;
 
 #ifdef unix
-    tix = __sync_fetch_and_add (lock->ticket, 1);
+    tix = __sync_fetch_and_add(lock->ticket, 1);
 #else
 #ifndef __MINGW64__
     tix = InterlockedExchangeAdd16(lock->ticket, 1);
@@ -479,12 +488,12 @@ void WriteLock(RWLock *lock) {
 #ifdef unix
         sched_yield();
 #else
-        SwitchToThread();
+    SwitchToThread();
 #endif
 
     w = PRES | (tix & PHID);
 #ifdef  unix
-    r = __sync_fetch_and_add (lock->rin, w);
+    r = __sync_fetch_and_add(lock->rin, w);
 #else
 #ifndef __MINGW64__
     r = InterlockedExchangeAdd16(lock->rin, w);
@@ -496,13 +505,13 @@ void WriteLock(RWLock *lock) {
 #ifdef unix
         sched_yield();
 #else
-        SwitchToThread();
+    SwitchToThread();
 #endif
 }
 
 void RWriteRelease(RWLock *lock) {
 #ifdef unix
-    __sync_fetch_and_and (lock->rin, ~MASK);
+    __sync_fetch_and_and(lock->rin, ~MASK);
 #else
 #ifndef __MINGW64__
     InterlockedAnd16(lock->rin, ~MASK);
@@ -516,7 +525,7 @@ void RWriteRelease(RWLock *lock) {
 void ReadLock(RWLock *lock) {
     ushort w;
 #ifdef unix
-    w = __sync_fetch_and_add (lock->rin, RINC) & MASK;
+    w = __sync_fetch_and_add(lock->rin, RINC) & MASK;
 #else
 #ifndef __MINGW64__
     w = InterlockedExchangeAdd16(lock->rin, RINC) & MASK;
@@ -527,15 +536,15 @@ void ReadLock(RWLock *lock) {
     if (w)
         while (w == (*lock->rin & MASK))
 #ifdef unix
-            sched_yield ();
+            sched_yield();
 #else
-            SwitchToThread();
+    SwitchToThread();
 #endif
 }
 
 void ReadRelease(RWLock *lock) {
 #ifdef unix
-    __sync_fetch_and_add (lock->rout, RINC);
+    __sync_fetch_and_add(lock->rout, RINC);
 #else
 #ifndef __MINGW64__
     InterlockedExchangeAdd16(lock->rout, RINC);
@@ -555,7 +564,7 @@ void bt_spinreadlock(BtSpinLatch *latch) {
 
     do {
 #ifdef unix
-        prev = __sync_fetch_and_add ((ushort *)latch, SHARE);
+        prev = __sync_fetch_and_add((ushort *) latch, SHARE);
 #else
 #ifndef __MINGW64__
         prev = InterlockedExchangeAdd16((ushort *) latch, SHARE);
@@ -568,7 +577,7 @@ void bt_spinreadlock(BtSpinLatch *latch) {
         if (!(prev & BOTH))
             return;
 #ifdef unix
-        prev = __sync_fetch_and_add ((ushort *)latch, -SHARE);
+        prev = __sync_fetch_and_add((ushort *) latch, -SHARE);
 #else
 #ifndef __MINGW64__
         prev = InterlockedExchangeAdd16((ushort *) latch, -SHARE);
@@ -577,7 +586,7 @@ void bt_spinreadlock(BtSpinLatch *latch) {
 #endif
 #endif
 #ifdef  unix
-        } while( sched_yield(), 1 );
+    } while (sched_yield(), 1);
 #else
     } while (SwitchToThread(), 1);
 #endif
@@ -590,7 +599,7 @@ void bt_spinwritelock(BtSpinLatch *latch) {
 
     do {
 #ifdef  unix
-        prev = __sync_fetch_and_or((ushort *)latch, PEND | XCL);
+        prev = __sync_fetch_and_or((ushort *) latch, PEND | XCL);
 #else
 #ifndef __MINGW64__
         prev = InterlockedOr16((ushort *) latch, PEND | XCL);
@@ -603,16 +612,16 @@ void bt_spinwritelock(BtSpinLatch *latch) {
                 return;
             else
 #ifdef unix
-                __sync_fetch_and_and ((ushort *)latch, ~XCL);
+                __sync_fetch_and_and((ushort *) latch, ~XCL);
 #else
 #ifndef __MINGW64__
-                InterlockedAnd16((ushort *) latch, ~XCL);
+        InterlockedAnd16((ushort *) latch, ~XCL);
 #else
-                __sync_fetch_and_and((ushort *) latch, ~XCL);
+        __sync_fetch_and_and((ushort *) latch, ~XCL);
 #endif
 #endif
 #ifdef  unix
-        } while( sched_yield(), 1 );
+    } while (sched_yield(), 1);
 #else
     } while (SwitchToThread(), 1);
 #endif
@@ -627,7 +636,7 @@ int bt_spinwritetry(BtSpinLatch *latch) {
     ushort prev;
 
 #ifdef  unix
-    prev = __sync_fetch_and_or((ushort *)latch, XCL);
+    prev = __sync_fetch_and_or((ushort *) latch, XCL);
 #else
 #ifndef __MINGW64__
     prev = InterlockedOr16((ushort *) latch, XCL);
@@ -642,12 +651,12 @@ int bt_spinwritetry(BtSpinLatch *latch) {
             return 1;
         else
 #ifdef unix
-            __sync_fetch_and_and ((ushort *)latch, ~XCL);
+            __sync_fetch_and_and((ushort *) latch, ~XCL);
 #else
 #ifndef __MINGW64__
-            InterlockedAnd16((ushort *) latch, ~XCL);
+    InterlockedAnd16((ushort *) latch, ~XCL);
 #else
-            __sync_fetch_and_and((ushort *) latch, ~XCL);
+    __sync_fetch_and_and((ushort *) latch, ~XCL);
 #endif
 #endif
     return 0;
@@ -657,7 +666,7 @@ int bt_spinwritetry(BtSpinLatch *latch) {
 
 void bt_spinreleasewrite(BtSpinLatch *latch) {
 #ifdef unix
-    __sync_fetch_and_and((ushort *)latch, ~BOTH);
+    __sync_fetch_and_and((ushort *) latch, ~BOTH);
 #else
 #ifndef __MINGW64__
     InterlockedAnd16((ushort *) latch, ~BOTH);
@@ -671,7 +680,7 @@ void bt_spinreleasewrite(BtSpinLatch *latch) {
 
 void bt_spinreleaseread(BtSpinLatch *latch) {
 #ifdef unix
-    __sync_fetch_and_add((ushort *)latch, -SHARE);
+    __sync_fetch_and_add((ushort *) latch, -SHARE);
 #else
 #ifndef __MINGW64__
     InterlockedExchangeAdd16((ushort *) latch, -SHARE);
@@ -687,8 +696,8 @@ BTERR bt_readpage(BtMgr *mgr, BtPage page, uid page_no) {
     off64_t off = page_no << mgr->page_bits;
 
 #ifdef unix
-    if( pread (mgr->idx, page, mgr->page_size, page_no << mgr->page_bits) < mgr->page_size ) {
-        fprintf (stderr, "Unable to read page %.8x errno = %d\n", page_no, errno);
+    if (pread(mgr->idx, page, mgr->page_size, page_no << mgr->page_bits) < mgr->page_size) {
+        fprintf(stderr, "Unable to read page %.8x errno = %d\n", page_no, errno);
         return BTERR_read;
     }
 #else
@@ -718,7 +727,7 @@ BTERR bt_writepage(BtMgr *mgr, BtPage page, uid page_no) {
     off64_t off = page_no << mgr->page_bits;
 
 #ifdef unix
-    if( pwrite(mgr->idx, page, mgr->page_size, off) < mgr->page_size )
+    if (pwrite(mgr->idx, page, mgr->page_size, off) < mgr->page_size)
         return BTERR_wrt;
 #else
     OVERLAPPED ovl[1];
@@ -767,7 +776,7 @@ BTERR bt_latchlink(BtDb *bt, uint hashidx, uint slot, uid page_no, uint loadit) 
 
 void bt_unpinlatch(BtLatchSet *latch) {
 #ifdef unix
-    if( ~latch->pin & CLOCK_bit )
+    if (~latch->pin & CLOCK_bit)
         __sync_fetch_and_or(&latch->pin, CLOCK_bit);
     __sync_fetch_and_add(&latch->pin, -1);
 #else
@@ -828,7 +837,7 @@ BtLatchSet *bt_pinlatch(BtDb *bt, uid page_no, uint loadit) {
 
     //  see if there are any unused pool entries
 #ifdef unix
-    slot = __sync_fetch_and_add (&bt->mgr->latchdeployed, 1) + 1;
+    slot = __sync_fetch_and_add(&bt->mgr->latchdeployed, 1) + 1;
 #else
     slot = InterlockedIncrement(&bt->mgr->latchdeployed);
 #endif
@@ -842,7 +851,7 @@ BtLatchSet *bt_pinlatch(BtDb *bt, uid page_no, uint loadit) {
     }
 
 #ifdef unix
-        __sync_fetch_and_add (&bt->mgr->latchdeployed, -1);
+    __sync_fetch_and_add(&bt->mgr->latchdeployed, -1);
 #else
     InterlockedDecrement(&bt->mgr->latchdeployed);
 #endif
@@ -945,8 +954,8 @@ void bt_mgrclose(BtMgr *mgr) {
     fprintf(stderr, "%d buffer pool pages flushed\n", num);
 
 #ifdef unix
-    munmap (mgr->hashtable, (uid)mgr->nlatchpage << mgr->page_bits);
-    munmap (mgr->pagezero, mgr->page_size);
+    munmap(mgr->hashtable, (uid) mgr->nlatchpage << mgr->page_bits);
+    munmap(mgr->pagezero, mgr->page_size);
 #else
     FlushViewOfFile(mgr->pagezero, 0);
     UnmapViewOfFile(mgr->pagezero);
@@ -955,8 +964,8 @@ void bt_mgrclose(BtMgr *mgr) {
     CloseHandle(mgr->hpool);
 #endif
 #ifdef unix
-    close (mgr->idx);
-    free (mgr);
+    close(mgr->idx);
+    free(mgr);
 #else
     FlushFileBuffers(mgr->idx);
     CloseHandle(mgr->idx);
@@ -968,8 +977,8 @@ void bt_mgrclose(BtMgr *mgr) {
 
 void bt_close(BtDb *bt) {
 #ifdef unix
-    if( bt->mem )
-        free (bt->mem);
+    if (bt->mem)
+        free(bt->mem);
 #else
     if (bt->mem)
         VirtualFree(bt->mem, 0, MEM_RELEASE);
@@ -1007,12 +1016,12 @@ BtMgr *bt_mgr(char *name, uint bits, uint nodemax) {
     }
 
 #ifdef unix
-    mgr = calloc (1, sizeof(BtMgr));
+    mgr = calloc(1, sizeof(BtMgr));
 
-    mgr->idx = open ((char*)name, O_RDWR | O_CREAT, 0666);
+    mgr->idx = open((char *) name, O_RDWR | O_CREAT, 0666);
 
-    if( mgr->idx == -1 ) {
-        fprintf (stderr, "Unable to open btree file\n");
+    if (mgr->idx == -1) {
+        fprintf(stderr, "Unable to open btree file\n");
         return free(mgr), NULL;
     }
 #else
@@ -1026,16 +1035,16 @@ BtMgr *bt_mgr(char *name, uint bits, uint nodemax) {
 #endif
 
 #ifdef unix
-    pagezero = valloc (BT_maxpage);
+    pagezero = valloc(BT_maxpage);
     *amt = 0;
 
     // read minimum page size to get root info
     //	to support raw disk partition files
     //	check if bits == 0 on the disk.
 
-    if( size = lseek (mgr->idx, 0L, 2) )
-        if( pread(mgr->idx, pagezero, BT_minpage, 0) == BT_minpage )
-            if( pagezero->alloc->bits )
+    if (size = lseek(mgr->idx, 0L, 2))
+        if (pread(mgr->idx, pagezero, BT_minpage, 0) == BT_minpage)
+            if (pagezero->alloc->bits)
                 bits = pagezero->alloc->bits;
             else
                 initit = 1;
@@ -1115,7 +1124,7 @@ BtMgr *bt_mgr(char *name, uint bits, uint nodemax) {
 
     mgrlatch:
 #ifdef unix
-    free (pagezero);
+    free(pagezero);
 #else
     VirtualFree(pagezero, 0, MEM_RELEASE);
 #endif
@@ -1123,17 +1132,17 @@ BtMgr *bt_mgr(char *name, uint bits, uint nodemax) {
     // mlock the pagezero page
 
     flag = PROT_READ | PROT_WRITE;
-    mgr->pagezero = mmap (0, mgr->page_size, flag, MAP_SHARED, mgr->idx, ALLOC_page << mgr->page_bits);
-    if( mgr->pagezero == MAP_FAILED ) {
-        fprintf (stderr, "Unable to mmap btree page zero, error = %d\n", errno);
-        return bt_mgrclose (mgr), NULL;
+    mgr->pagezero = mmap(0, mgr->page_size, flag, MAP_SHARED, mgr->idx, ALLOC_page << mgr->page_bits);
+    if (mgr->pagezero == MAP_FAILED) {
+        fprintf(stderr, "Unable to mmap btree page zero, error = %d\n", errno);
+        return bt_mgrclose(mgr), NULL;
     }
-    mlock (mgr->pagezero, mgr->page_size);
+    mlock(mgr->pagezero, mgr->page_size);
 
-    mgr->hashtable = (void *)mmap (0, (uid)mgr->nlatchpage << mgr->page_bits, flag, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
-    if( mgr->hashtable == MAP_FAILED ) {
-        fprintf (stderr, "Unable to mmap anonymous buffer pool pages, error = %d\n", errno);
-        return bt_mgrclose (mgr), NULL;
+    mgr->hashtable = (void *) mmap(0, (uid) mgr->nlatchpage << mgr->page_bits, flag, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
+    if (mgr->hashtable == MAP_FAILED) {
+        fprintf(stderr, "Unable to mmap anonymous buffer pool pages, error = %d\n", errno);
+        return bt_mgrclose(mgr), NULL;
     }
 #else
     flag = PAGE_READWRITE;
@@ -1181,14 +1190,14 @@ BtDb *bt_open(BtMgr *mgr) {
     memset(bt, 0, sizeof(*bt));
     bt->mgr = mgr;
 #ifdef unix
-    bt->mem = valloc (2 *mgr->page_size);
+    bt->mem = valloc(2 * mgr->page_size);
 #else
     bt->mem = VirtualAlloc(NULL, 2 * mgr->page_size, MEM_COMMIT, PAGE_READWRITE);
 #endif
     bt->frame = (BtPage) bt->mem;
     bt->cursor = (BtPage) (bt->mem + 1 * mgr->page_size);
 #ifdef unix
-    bt->thread_no = __sync_fetch_and_add (mgr->thread_no, 1) + 1;
+    bt->thread_no = __sync_fetch_and_add(mgr->thread_no, 1) + 1;
 #else
     bt->thread_no = InterlockedIncrement16(mgr->thread_no);
 #endif
@@ -3044,30 +3053,31 @@ double getCpuTime(int type) {
 }
 
 #else
+
 #include <time.h>
 #include <sys/resource.h>
 
-double getCpuTime(int type)
-{
-struct rusage used[1];
-struct timeval tv[1];
+double getCpuTime(int type) {
+    struct rusage used[1];
+    struct timeval tv[1];
 
-    switch( type ) {
-    case 0:
-        gettimeofday(tv, NULL);
-        return (double)tv->tv_sec + (double)tv->tv_usec / 1000000;
+    switch (type) {
+        case 0:
+            gettimeofday(tv, NULL);
+            return (double) tv->tv_sec + (double) tv->tv_usec / 1000000;
 
-    case 1:
-        getrusage(RUSAGE_SELF, used);
-        return (double)used->ru_utime.tv_sec + (double)used->ru_utime.tv_usec / 1000000;
+        case 1:
+            getrusage(RUSAGE_SELF, used);
+            return (double) used->ru_utime.tv_sec + (double) used->ru_utime.tv_usec / 1000000;
 
-    case 2:
-        getrusage(RUSAGE_SELF, used);
-        return (double)used->ru_stime.tv_sec + (double)used->ru_stime.tv_usec / 1000000;
+        case 2:
+            getrusage(RUSAGE_SELF, used);
+            return (double) used->ru_stime.tv_sec + (double) used->ru_stime.tv_usec / 1000000;
     }
 
     return 0;
 }
+
 #endif
 
 void bt_poolaudit(BtMgr *mgr) {
@@ -3146,7 +3156,7 @@ uint bt_latchaudit(BtDb *bt) {
     while (page_no < bt_getid(bt->mgr->pagezero->alloc->right)) {
         uid off = page_no << bt->mgr->page_bits;
 #ifdef unix
-        pread (bt->mgr->idx, bt->frame, bt->mgr->page_size, off);
+        pread(bt->mgr->idx, bt->frame, bt->mgr->page_size, off);
 #else
         DWORD amt[1];
 
@@ -3182,7 +3192,8 @@ typedef struct {
 //  then list them onto std-out
 
 #ifdef unix
-void *index_file (void *arg)
+
+void *index_file(void *arg)
 #else
 
 uint __stdcall index_file(void *arg)
@@ -3365,8 +3376,8 @@ uint __stdcall index_file(void *arg)
             break;
 
         case 'c':
-#ifdef unix
-            posix_fadvise( bt->mgr->idx, 0, 0, POSIX_FADV_SEQUENTIAL);
+#if defined(unix) && !defined(__APPLE__)
+            posix_fadvise(bt->mgr->idx, 0, 0, POSIX_FADV_SEQUENTIAL);
 #endif
             fprintf(stderr, "started counting\n");
             page_no = LEAF_page;
@@ -3445,7 +3456,7 @@ int main(int argc, char **argv) {
 
     cnt = argc - 6;
 #ifdef unix
-    threads = malloc (cnt * sizeof(pthread_t));
+    threads = malloc(cnt * sizeof(pthread_t));
 #else
     threads = GlobalAlloc(GMEM_FIXED | GMEM_ZEROINIT, cnt * sizeof(HANDLE));
 #endif
@@ -3467,7 +3478,7 @@ int main(int argc, char **argv) {
         args[idx].num = num;
         args[idx].idx = idx;
 #ifdef unix
-        if( err = pthread_create (threads + idx, NULL, index_file, args + idx) )
+        if (err = pthread_create(threads + idx, NULL, index_file, args + idx))
             fprintf(stderr, "Error creating thread %d\n", err);
 #else
         threads[idx] = (HANDLE) _beginthreadex(NULL, 65536, index_file, args + idx, 0, NULL);
@@ -3477,8 +3488,8 @@ int main(int argc, char **argv) {
     // 	wait for termination
 
 #ifdef unix
-    for( idx = 0; idx < cnt; idx++ )
-        pthread_join (threads[idx], NULL);
+    for (idx = 0; idx < cnt; idx++)
+        pthread_join(threads[idx], NULL);
 #else
     WaitForMultipleObjects(cnt, threads, TRUE, INFINITE);
 

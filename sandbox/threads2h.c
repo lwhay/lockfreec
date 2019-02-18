@@ -28,6 +28,13 @@ REDISTRIBUTION OF THIS SOFTWARE.
 #define _GNU_SOURCE
 #endif
 
+#ifdef __APPLE__
+#define unix
+typedef unsigned long long off64_t;
+typedef unsigned short ushort;
+typedef unsigned int uint;
+#endif
+
 #ifdef unix
 
 #include <unistd.h>
@@ -414,7 +421,7 @@ void bt_spinreadlock(BtSpinLatch *latch) {
             return;
 
 #ifdef  unix
-        } while (sched_yield(), 1);
+    } while (sched_yield(), 1);
 #else
     } while (SwitchToThread(), 1);
 #endif
@@ -453,7 +460,7 @@ void bt_spinwritelock(BtSpinLatch *latch) {
         if (prev)
             return;
 #ifdef  unix
-        } while (sched_yield(), 1);
+    } while (sched_yield(), 1);
 #else
     } while (SwitchToThread(), 1);
 #endif
@@ -991,11 +998,11 @@ BtMgr *bt_mgr(char *name, uint mode, uint bits, uint poolmax, uint segsize, uint
     if (write(mgr->idx, latchmgr, mgr->page_size) < mgr->page_size)
         return bt_mgrclose(mgr), NULL;
 #else
-    if (!WriteFile(mgr->idx, (char *) latchmgr, mgr->page_size, amt, NULL))
-        return bt_mgrclose(mgr), NULL;
+        if (!WriteFile(mgr->idx, (char *) latchmgr, mgr->page_size, amt, NULL))
+            return bt_mgrclose(mgr), NULL;
 
-    if (*amt < mgr->page_size)
-        return bt_mgrclose(mgr), NULL;
+        if (*amt < mgr->page_size)
+            return bt_mgrclose(mgr), NULL;
 #endif
 
     memset(latchmgr, 0, 1 << bits);

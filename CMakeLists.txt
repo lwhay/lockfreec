@@ -8,12 +8,15 @@ set(CMAKE_CXX_COMPILER "g++")
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 11)
 
-#set(BOOST_ROOT D:/cygwin64)
-#set(Boost_INCLUDE_DIR ${BOOST_ROOT}/usr/include)
-#set(Boost_LIBRARY_DIR ${BOOST_ROOT}/lib)
-#find_package(Boost 1.66.0 REQUIRED COMPONENTS date_time filesystem iostreams)
-#include_directories(${Boost_INCLUDE_DIR})
-#link_directories(${Boost_LIBRARY_DIR})
+if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    #set(BOOST_ROOT D:/cygwin64)
+    #set(Boost_INCLUDE_DIR ${BOOST_ROOT}/usr/include)
+    #set(Boost_LIBRARY_DIR ${BOOST_ROOT}/lib)
+    #find_package(Boost 1.66.0 REQUIRED COMPONENTS date_time filesystem iostreams)
+    find_package(Boost 1.50.0 REQUIRED COMPONENTS date_time filesystem iostreams)
+    include_directories(${Boost_INCLUDE_DIR})
+    link_directories(${Boost_LIBRARY_DIR})
+endif ()
 
 include_directories(.)
 include_directories(advance)
@@ -103,20 +106,35 @@ option(WITH_FOSTER_TESTS "build with foster tests" ON)
 if (WITH_FOSTER_TESTS)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSTANDALONE")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Dlinux")
-    set(FOSTER_TESTS
-            sandbox/btree2s.c
-            sandbox/btree2t.c
-            sandbox/btree2u.c
-            sandbox/btree2v.c
-            sandbox/threads2h.c
-            sandbox/threads2i.c
-            sandbox/threads2j.c
-            sandbox/threadskv8.c
-            #sandbox/threadskv10g.c
-            #sandbox/threadskv10h.c
-            sandbox/btree2sTest.c
-            sandbox/btree2sBulkInsert.c
-            )
+    if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+        set(FOSTER_TESTS
+                sandbox/btree2s.c
+                sandbox/btree2t.c
+                sandbox/btree2u.c
+                sandbox/btree2v.c
+                sandbox/threads2h.c
+                sandbox/threads2i.c
+                sandbox/threads2j.c
+                sandbox/threadskv8.c
+                #sandbox/threadskv10g.c
+                #sandbox/threadskv10h.c
+                sandbox/btree2sTest.c
+                sandbox/btree2sBulkInsert.c
+                )
+    else ()
+        set(FOSTER_TESTS
+                sandbox/btree2s.c
+                sandbox/btree2t.c
+                sandbox/btree2u.c
+                sandbox/threads2h.c
+                sandbox/threads2i.c
+                sandbox/threadskv8.c
+                #sandbox/threadskv10g.c
+                #sandbox/threadskv10h.c
+                sandbox/btree2sTest.c
+                sandbox/btree2sBulkInsert.c
+                )
+    endif ()
 endif ()
 
 set(UNIT_TESTS_EXES ${UNIT_TEST})

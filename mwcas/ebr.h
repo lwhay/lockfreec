@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include "rel_ptr.h"
 
-#if defined(__MINGW64__) || defined(__CYGWIN__)
+#if defined(__MINGW64__) || defined(__CYGWIN__) || defined(__APPLE__)
 
 #include <string.h>
 

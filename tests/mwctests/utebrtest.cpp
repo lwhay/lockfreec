@@ -6,7 +6,7 @@
 #include <sys/time.h>
 #include "ebr.h"
 
-#if defined(linux) || defined(__MINGW64__) || defined(__CYGWIN__)
+#if defined(linux) || defined(__MINGW64__) || defined(__CYGWIN__) || defined(__APPLE__)
 
 #include <pthread.h>
 

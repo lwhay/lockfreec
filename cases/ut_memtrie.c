@@ -249,10 +249,9 @@ void memtrie_test_internal_search(struct trie_state *ts) {
     //test
     internal_display_test_name("trie_simple_search over !");
     return;
-
 }
 
-void memtrie_test_internal_thread_simple_search(void *state) {
+thread_return_t CALLING_CONVENTION memtrie_test_internal_thread_simple_search(void *state) {
     struct trie_state_test *tst;
     struct hash_data *data;
     atom_t search_num = 0, error_num = 0, duplication = 0, readline = 0, maxline = 0;
