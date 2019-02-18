@@ -43,7 +43,8 @@ REDISTRIBUTION OF THIS SOFTWARE.
 #endif
 
 #ifdef unix
-                                                                                                                        #include <unistd.h>
+
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -52,6 +53,7 @@ REDISTRIBUTION OF THIS SOFTWARE.
 #include <errno.h>
 #include <pthread.h>
 #include <limits.h>
+
 #else
 #define WIN32_LEAN_AND_MEAN
 
@@ -72,8 +74,10 @@ REDISTRIBUTION OF THIS SOFTWARE.
 typedef unsigned long long uid;
 typedef unsigned long long logseqno;
 
-#ifndef unix
+#if (!defined(unix) || defined(__CYGWIN__))
+#ifndef off64_t
 typedef unsigned long long off64_t;
+#endif
 typedef unsigned short ushort;
 typedef unsigned int uint;
 #endif
@@ -593,7 +597,7 @@ uint bt_availnext(BtMgr *mgr) {
 
     while (1) {
 #ifdef unix
-        entry = __sync_fetch_and_add (&mgr->pagezero->latchvictim, 1) + 1;
+        entry = __sync_fetch_and_add(&mgr->pagezero->latchvictim, 1) + 1;
 #else
         entry = _InterlockedIncrement(&mgr->pagezero->latchvictim);
 #endif
@@ -717,8 +721,8 @@ void bt_mgrclose(BtMgr *mgr) {
     fdatasync(mgr->idx);
 
 #ifdef unix
-    while( mgr->segments )
-        munmap (mgr->pages[--mgr->segments], (uid)mgr->page_size << SEG_bits);
+    while (mgr->segments)
+        munmap(mgr->pages[--mgr->segments], (uid) mgr->page_size << SEG_bits);
 #else
     while (mgr->segments) {
         FlushViewOfFile(mgr->pages[--mgr->segments], 0);
@@ -726,8 +730,8 @@ void bt_mgrclose(BtMgr *mgr) {
     }
 #endif
 #ifdef unix
-    close (mgr->idx);
-    free (mgr);
+    close(mgr->idx);
+    free(mgr);
 #else
     FlushFileBuffers(mgr->idx);
     CloseHandle(mgr->idx);
@@ -810,20 +814,20 @@ BtMgr *bt_mgr(char *name, uint pagebits, uint leafxtra, uint nodemax) {
             fprintf(stderr, "pagebits < minbits\n"), exit(1);
 
 #ifdef unix
-    mgr = calloc (1, sizeof(BtMgr));
+    mgr = calloc(1, sizeof(BtMgr));
 
-    mgr->idx = open ((char*)name, O_RDWR | O_CREAT, 0666);
+    mgr->idx = open((char *) name, O_RDWR | O_CREAT, 0666);
 
-    if( mgr->idx == -1 ) {
-        fprintf (stderr, "Unable to create/open btree file %s\n", name);
+    if (mgr->idx == -1) {
+        fprintf(stderr, "Unable to create/open btree file %s\n", name);
         return free(mgr), NULL;
     }
 
-    memset (lock, 0, sizeof(lock));
+    memset(lock, 0, sizeof(lock));
     lock->l_len = sizeof(struct BtPage_);
     lock->l_type = F_WRLCK;
 
-    if( fcntl (mgr->idx, F_SETLKW, lock) < 0 ) {
+    if (fcntl(mgr->idx, F_SETLKW, lock) < 0) {
         fprintf(stderr, "unable to lock record zero %s\n", name);
         exit(1);
     }
@@ -840,25 +844,25 @@ BtMgr *bt_mgr(char *name, uint pagebits, uint leafxtra, uint nodemax) {
 #endif
 
 #ifdef unix
-                                                                                                                            pagezero = valloc (BT_maxpage);
-	page = (BtPage)pagezero;
-	*amt = 0;
+    pagezero = valloc(BT_maxpage);
+    page = (BtPage) pagezero;
+    *amt = 0;
 
-	// read minimum page size to get root info
-	//	to support raw disk partition files
-	//	check if page_bits == 0 on the disk.
+    // read minimum page size to get root info
+    //	to support raw disk partition files
+    //	check if page_bits == 0 on the disk.
 
-	if( size = lseek (mgr->idx, 0L, 2) )
-		if( pread(mgr->idx, pagezero, BT_minpage, 0) == BT_minpage )
-			if( pagezero->page_bits ) {
-				pagebits = pagezero->page_bits;
-				leafxtra = pagezero->leaf_xtra;
-			} else
-				initit = 1;
-		else
-			return free(mgr), free(pagezero), NULL;
-	else
-		initit = 1;
+    if (size = lseek(mgr->idx, 0L, 2))
+        if (pread(mgr->idx, pagezero, BT_minpage, 0) == BT_minpage)
+            if (pagezero->page_bits) {
+                pagebits = pagezero->page_bits;
+                leafxtra = pagezero->leaf_xtra;
+            } else
+                initit = 1;
+        else
+            return free(mgr), free(pagezero), NULL;
+    else
+        initit = 1;
 #else
     pagezero = VirtualAlloc(NULL, BT_maxpage, MEM_COMMIT, PAGE_READWRITE);
     size = GetFileSize(mgr->idx, amt);
@@ -943,7 +947,7 @@ BtMgr *bt_mgr(char *name, uint pagebits, uint leafxtra, uint nodemax) {
 
     mgrlatch:
 #ifdef unix
-    free (pagezero);
+    free(pagezero);
 #else
     VirtualFree(pagezero, 0, MEM_RELEASE);
 #endif
@@ -3139,30 +3143,31 @@ double getCpuTime(int type) {
 }
 
 #else
+
 #include <time.h>
 #include <sys/resource.h>
 
-double getCpuTime(int type)
-{
-struct rusage used[1];
-struct timeval tv[1];
+double getCpuTime(int type) {
+    struct rusage used[1];
+    struct timeval tv[1];
 
-    switch( type ) {
-    case 0:
-        gettimeofday(tv, NULL);
-        return (double)tv->tv_sec + (double)tv->tv_usec / 1000000;
+    switch (type) {
+        case 0:
+            gettimeofday(tv, NULL);
+            return (double) tv->tv_sec + (double) tv->tv_usec / 1000000;
 
-    case 1:
-        getrusage(RUSAGE_SELF, used);
-        return (double)used->ru_utime.tv_sec + (double)used->ru_utime.tv_usec / 1000000;
+        case 1:
+            getrusage(RUSAGE_SELF, used);
+            return (double) used->ru_utime.tv_sec + (double) used->ru_utime.tv_usec / 1000000;
 
-    case 2:
-        getrusage(RUSAGE_SELF, used);
-        return (double)used->ru_stime.tv_sec + (double)used->ru_stime.tv_usec / 1000000;
+        case 2:
+            getrusage(RUSAGE_SELF, used);
+            return (double) used->ru_stime.tv_sec + (double) used->ru_stime.tv_usec / 1000000;
     }
 
     return 0;
 }
+
 #endif
 
 void bt_poolaudit(BtMgr *mgr, char *type) {
@@ -3198,7 +3203,8 @@ typedef struct {
 //  then list them onto std-out
 
 #ifdef unix
-void *index_file (void *arg)
+
+void *index_file(void *arg)
 #else
 
 uint __stdcall index_file(void *arg)
@@ -3421,7 +3427,7 @@ uint __stdcall index_file(void *arg)
             page = malloc(size);
 
 #ifdef unix
-            posix_fadvise( bt->mgr->idx, 0, 0, POSIX_FADV_SEQUENTIAL);
+            posix_fadvise(bt->mgr->idx, 0, 0, POSIX_FADV_SEQUENTIAL);
 #endif
             while (page_no < bt->mgr->pagezero->allocpage) {
                 if (bt_readpage(bt->mgr, page, page_no, 0))
@@ -3455,7 +3461,7 @@ uint __stdcall index_file(void *arg)
             cnt = 0;
 
 #ifdef unix
-            posix_fadvise( bt->main->idx, 0, 0, POSIX_FADV_SEQUENTIAL);
+            posix_fadvise(bt->main->idx, 0, 0, POSIX_FADV_SEQUENTIAL);
 #endif
             while (page_no < bt->main->pagezero->allocpage) {
                 if (bt_readpage(bt->main, page, page_no, 0))
@@ -3571,7 +3577,7 @@ int main(int argc, char **argv) {
         cnt = 0;
 
 #ifdef unix
-    threads = malloc (cnt * sizeof(pthread_t));
+    threads = malloc(cnt * sizeof(pthread_t));
 #else
     threads = GlobalAlloc(GMEM_FIXED | GMEM_ZEROINIT, cnt * sizeof(HANDLE));
 #endif
@@ -3606,8 +3612,8 @@ int main(int argc, char **argv) {
             args[idx].num = num;
             args[idx].idx = idx;
 #ifdef unix
-            if( err = pthread_create (threads + idx, NULL, index_file, args + idx) )
-                 fprintf(stderr, "Error creating thread %d\n", err);
+            if (err = pthread_create(threads + idx, NULL, index_file, args + idx))
+                fprintf(stderr, "Error creating thread %d\n", err);
 #else
             threads[idx] = (HANDLE) _beginthreadex(NULL, 131072, index_file, args + idx, 0, NULL);
 #endif
@@ -3625,9 +3631,9 @@ int main(int argc, char **argv) {
     // 	wait for termination
 
 #ifdef unix
-    if( cnt > 1 )
-        for( idx = 0; idx < cnt; idx++ )
-            pthread_join (threads[idx], NULL);
+    if (cnt > 1)
+        for (idx = 0; idx < cnt; idx++)
+            pthread_join(threads[idx], NULL);
 #else
     if (cnt > 1)
         WaitForMultipleObjects(cnt, threads, TRUE, INFINITE);

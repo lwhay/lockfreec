@@ -63,8 +63,10 @@ REDISTRIBUTION OF THIS SOFTWARE.
 
 typedef unsigned long long uid;
 
-#ifndef unix
+#if (!defined(unix) || defined(__CYGWIN__))
+#ifndef off64_t
 typedef unsigned long long off64_t;
+#endif
 typedef unsigned short ushort;
 typedef unsigned int uint;
 #endif
@@ -2193,9 +2195,9 @@ void bt_latchaudit(BtDb *bt) {
     BtKey ptr;
 
 #ifdef unix
-    if (*(uint * )(bt->mgr->latchmgr->lock))
+    if (*(uint *) (bt->mgr->latchmgr->lock))
         fprintf(stderr, "Alloc page locked\n");
-    *(uint * )(bt->mgr->latchmgr->lock) = 0;
+    *(uint *) (bt->mgr->latchmgr->lock) = 0;
 
     for (idx = 1; idx <= bt->mgr->latchmgr->latchdeployed; idx++) {
         latch = bt->mgr->latchsets + idx;
@@ -2218,10 +2220,10 @@ void bt_latchaudit(BtDb *bt) {
     }
 
     for (hashidx = 0; hashidx < bt->mgr->latchmgr->latchhash; hashidx++) {
-        if (*(uint * )(bt->mgr->latchmgr->table[hashidx].latch))
+        if (*(uint *) (bt->mgr->latchmgr->table[hashidx].latch))
             fprintf(stderr, "hash entry %d locked\n", hashidx);
 
-        *(uint * )(bt->mgr->latchmgr->table[hashidx].latch) = 0;
+        *(uint *) (bt->mgr->latchmgr->table[hashidx].latch) = 0;
 
         if (idx = bt->mgr->latchmgr->table[hashidx].slot)
             do {

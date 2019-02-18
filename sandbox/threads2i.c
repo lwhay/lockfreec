@@ -65,9 +65,9 @@ typedef unsigned int uint;
 
 typedef unsigned long long uid;
 
-#ifndef unix
-#ifndef __MINGW64__
-typedef unsigned long long	off64_t;
+#if (!defined(unix) || defined(__CYGWIN__))
+#ifndef off64_t
+typedef unsigned long long off64_t;
 #endif
 typedef unsigned short ushort;
 typedef unsigned int uint;
@@ -916,11 +916,11 @@ BtMgr *bt_mgr(char *name, uint mode, uint bits, uint poolmax, uint segsize, uint
     if (write(mgr->idx, latchmgr, mgr->page_size) < mgr->page_size)
         return bt_mgrclose(mgr), NULL;
 #else
-        if (!WriteFile(mgr->idx, (char *) latchmgr, mgr->page_size, amt, NULL))
-            return bt_mgrclose(mgr), NULL;
+    if (!WriteFile(mgr->idx, (char *) latchmgr, mgr->page_size, amt, NULL))
+        return bt_mgrclose(mgr), NULL;
 
-        if (*amt < mgr->page_size)
-            return bt_mgrclose(mgr), NULL;
+    if (*amt < mgr->page_size)
+        return bt_mgrclose(mgr), NULL;
 #endif
 
     memset(latchmgr, 0, 1 << bits);

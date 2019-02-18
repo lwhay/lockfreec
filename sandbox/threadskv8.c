@@ -73,8 +73,8 @@ typedef unsigned int uint;
 
 typedef unsigned long long uid;
 
-#ifndef unix
-#ifndef __MINGW64__
+#if (!defined(unix) || defined(__CYGWIN__))
+#ifndef off64_t
 typedef unsigned long long off64_t;
 #endif
 typedef unsigned short ushort;

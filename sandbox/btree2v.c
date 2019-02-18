@@ -28,7 +28,9 @@ REDISTRIBUTION OF THIS SOFTWARE.
 #ifdef linux
 #define _GNU_SOURCE
 #ifndef __APPLE__
+
 #include <linux/futex.h>
+
 #endif
 
 #include <limits.h>
@@ -70,9 +72,9 @@ typedef unsigned int uint;
 
 typedef unsigned long long uid;
 
-#ifndef unix
-#ifndef linux
-typedef unsigned long long	off64_t;
+#if (!defined(unix) || defined(__CYGWIN__))
+#ifndef off64_t
+typedef unsigned long long off64_t;
 #endif
 typedef unsigned short ushort;
 typedef unsigned int uint;
@@ -796,18 +798,18 @@ BtDb *bt_open(char *name, uint mode, uint bits, uint nodemax) {
         return free(bt), NULL;
     }
 #else
-        bt = GlobalAlloc(GMEM_FIXED | GMEM_ZEROINIT, sizeof(BtDb));
-        attr = FILE_ATTRIBUTE_NORMAL;
-        bt->idx = CreateFile(name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS,
-                             attr, NULL);
+    bt = GlobalAlloc(GMEM_FIXED | GMEM_ZEROINIT, sizeof(BtDb));
+    attr = FILE_ATTRIBUTE_NORMAL;
+    bt->idx = CreateFile(name, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_ALWAYS,
+                         attr, NULL);
 
-        if (bt->idx == INVALID_HANDLE_VALUE) {
-            fprintf(stderr, "unable to open %s\n", name);
-            return GlobalFree(bt), NULL;
-        }
+    if (bt->idx == INVALID_HANDLE_VALUE) {
+        fprintf(stderr, "unable to open %s\n", name);
+        return GlobalFree(bt), NULL;
+    }
 #endif
 #ifdef unix
-    memset (lock, 0, sizeof(lock));
+    memset(lock, 0, sizeof(lock));
     lock->l_len = sizeof(struct BtPage_);
     lock->l_type = F_WRLCK;
 

@@ -61,8 +61,8 @@ typedef unsigned int uint;
 
 typedef unsigned long long uid;
 
-#ifndef unix
-#ifndef linux
+#if (!defined(unix) || defined(__CYGWIN__))
+#ifndef off64_t
 typedef unsigned long long off64_t;
 #endif
 typedef unsigned short ushort;
@@ -325,7 +325,7 @@ BTERR bt_lockpage(BtDb *bt, uid page_no, BtLock mode) {
         off += 2 * sizeof(*bt->page);    // use third segment
 
 #ifdef unix
-    memset (lock, 0, sizeof(lock));
+    memset(lock, 0, sizeof(lock));
 
     lock->l_start = off;
     lock->l_type = (mode == BtLockDelete || mode == BtLockWrite || mode == BtLockParent) ? F_WRLCK : F_RDLCK;
@@ -375,7 +375,7 @@ BTERR bt_unlockpage(BtDb *bt, uid page_no, BtLock mode) {
         off += 2 * sizeof(*bt->page);    // use third segment
 
 #ifdef unix
-    memset (lock, 0, sizeof(lock));
+    memset(lock, 0, sizeof(lock));
 
     lock->l_start = off;
     lock->l_type = F_UNLCK;
@@ -454,7 +454,7 @@ BtDb *bt_open(char *name, uint mode, uint bits, uint nodemax, uint pgblk) {
 
 #ifdef unix
     bt = malloc(sizeof(BtDb) + nodemax * sizeof(BtHash));
-    memset (bt, 0, sizeof(BtDb));
+    memset(bt, 0, sizeof(BtDb));
 
     switch (mode & 0x7fff) {
         case BT_fl:
@@ -601,11 +601,11 @@ BtDb *bt_open(char *name, uint mode, uint bits, uint nodemax, uint pgblk) {
     if (write(bt->idx, bt->alloc, bt->page_size) < bt->page_size)
         return bt_close(bt), NULL;
 #else
-        if (!WriteFile(bt->idx, (char *) bt->alloc, bt->page_size, amt, NULL))
-            return bt_close(bt), NULL;
+    if (!WriteFile(bt->idx, (char *) bt->alloc, bt->page_size, amt, NULL))
+        return bt_close(bt), NULL;
 
-        if (*amt < bt->page_size)
-            return bt_close(bt), NULL;
+    if (*amt < bt->page_size)
+        return bt_close(bt), NULL;
 #endif
 
     memset(bt->frame, 0, bt->page_size);
