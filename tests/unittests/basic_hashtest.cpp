@@ -1,11 +1,13 @@
 //
 // Created by Michael on 2019/2/14.
 //
-#include "basic_hashfunc.h"
+#include <unordered_set>
+#include <string>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include "basic_hashfunc.h"
 
 //char *rdfFilePath = "d:/trie_data/dbpedia_all.nt";
 char *rdfFilePath = "d:/trie_data/University_rand_longstr.nt";
@@ -85,8 +87,62 @@ void testRDFString() {
     printf("%llu, %llu, %d\n", lc, total, ((end.tv_sec - begin.tv_sec) * 1000000 + end.tv_usec - begin.tv_usec));
 }
 
+void testUniqRDFString() {
+    std::unordered_set<std::string> uniq;
+    char tmpstr[4096];
+    char *line = NULL;
+    const char *delim = " ";
+    size_t len;
+    uint64_t lc = 0;
+    int counters[BUCKET_NUMBER];
+    memset(counters, 0, BUCKET_NUMBER * sizeof(int));
+    FILE *fp = fopen(rdfFilePath, "rb+");
+    struct timeval begin;
+    gettimeofday(&begin, NULL);
+    while (getline(&line, &len, fp) != -1) {
+        int cnt = 0;
+        char *p = line;
+        do {
+            if (cnt++ == 3) {
+                break;
+            }
+            char *pn = strpbrk(p, delim);
+            if (!pn) {
+                break;
+            } else {
+                memset(tmpstr, 0, 4096);
+                memcpy(tmpstr, p, pn - p);
+                if (uniq.find(tmpstr) == uniq.end()) {
+                    uniq.insert(tmpstr);
+                    uint32_t idx = __hash_func(p, pn - p) % BUCKET_NUMBER;
+                    if (lc % 1000000 == 0 && cnt == 1) {
+                        printf("\t%s\n", p);
+                    }
+                    counters[idx]++;
+                }
+            }
+            p = pn + 1;
+        } while (p);
+        lc++;
+    }
+    struct timeval end;
+    gettimeofday(&end, NULL);
+    fclose(fp);
+    uint64_t total = 0;
+    for (int i = 0; i < BUCKET_NUMBER; i++) {
+        total += counters[i];
+        printf("%6d\t", counters[i]);
+        if ((i + 1) % 32 == 0) {
+            printf("\n");
+        }
+    }
+    printf("%llu, %llu, %d\n", lc, total, ((end.tv_sec - begin.tv_sec) * 1000000 + end.tv_usec - begin.tv_usec));
+}
+
 int main() {
     testInt64();
     printf("******************************************************************\n");
     testRDFString();
+    printf("******************************************************************\n");
+    testUniqRDFString();
 }

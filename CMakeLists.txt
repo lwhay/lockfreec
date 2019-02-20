@@ -65,7 +65,7 @@ enable_testing()
 option(WITH_UNIT_TESTS "build with unittest" ON)
 if (WITH_UNIT_TESTS)
     set(UNIT_TEST
-            tests/unittests/basic_hashtest.c
+            tests/unittests/basic_hashtest.cpp
             tests/unittests/bloom_bitsettest.c
             tests/unittests/bloom_hashtest.c)
 endif ()
