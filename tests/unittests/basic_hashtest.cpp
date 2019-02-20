@@ -112,13 +112,15 @@ void testUniqRDFString() {
             } else {
                 memset(tmpstr, 0, 4096);
                 memcpy(tmpstr, p, pn - p);
+                bool found = true;
                 if (uniq.find(tmpstr) == uniq.end()) {
+                    found = false;
                     uniq.insert(tmpstr);
                     uint32_t idx = __hash_func(p, pn - p) % BUCKET_NUMBER;
-                    if (lc % 1000000 == 0 && cnt == 1) {
-                        printf("\t%s\n", p);
-                    }
                     counters[idx]++;
+                }
+                if (lc % 1000000 == 0 && cnt == 1) {
+                    printf("\t%d: %s\n", found, p);
                 }
             }
             p = pn + 1;
