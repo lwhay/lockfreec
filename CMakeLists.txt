@@ -24,6 +24,7 @@ include_directories(advance/hashfunc)
 include_directories(basic)
 include_directories(cases)
 include_directories(mwcas)
+include_directories(mwcas/harris)
 
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     set(PTHREAD -lpthread)
@@ -80,16 +81,18 @@ endif ()
 
 option(WITH_MWLF_TESTS "build with multiword lftests" ON)
 if (WITH_MWLF_TESTS)
-    if (CMAKE_SYSTEM_NAME MATCHES "Linux")
-        set(MWLF_TEST
-                tests/it_moodycqtest.cpp
-                tests/it_basiclfqueuetest.cpp)
-    else ()
+    set(MWLF_TEST
+            tests/mwctests/harris/datatypetest.c)
+    set(MWLF_TEST
+            tests/mwctests/harris/valcastest.cpp
+            tests/it_moodycqtest.cpp
+            tests/it_basiclfqueuetest.cpp
+            ${MWLF_TEST})
+    if (NOT (CMAKE_SYSTEM_NAME MATCHES "Linux"))
         set(MWLF_TEST
                 tests/it_mwcastest.cpp
                 tests/mwctests/utebrtest.cpp
-                tests/it_moodycqtest.cpp
-                tests/it_basiclfqueuetest.cpp)
+                ${MWLF_TEST})
     endif ()
 endif ()
 
