@@ -21,6 +21,12 @@ endif ()
 include_directories(.)
 include_directories(advance)
 include_directories(advance/hashfunc)
+include_directories(bench)
+include_directories(bench/cc)
+include_directories(bench/common)
+include_directories(bench/misc)
+include_directories(bench/small)
+include_directories(bench/storage)
 include_directories(basic)
 include_directories(cases)
 include_directories(mwcas)
@@ -69,6 +75,17 @@ if (WITH_UNIT_TESTS)
             tests/unittests/basic_hashtest.cpp
             tests/unittests/bloom_bitsettest.c
             tests/unittests/bloom_hashtest.c)
+endif ()
+
+option(WITH_CC_TESTS "build with concurrent control" ON)
+if (WITH_CC_TESTS)
+    set(CC_LIBS
+            bench/cc/vll.cpp
+            bench/misc/wl.cpp
+            bench/small/tpcc_helper.cpp
+            bench/storage/catalog.cpp
+            bench/storage/row.cpp
+            bench/storage/table.cpp)
 endif ()
 
 option(WITH_LF_TESTS "build with lftests" ON)
