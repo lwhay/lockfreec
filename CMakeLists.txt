@@ -25,9 +25,11 @@ include_directories(bench)
 include_directories(bench/cc)
 include_directories(bench/common)
 include_directories(bench/misc)
-include_directories(bench/small)
+include_directories(bench/loads)
 include_directories(bench/storage)
 include_directories(bench/storage/index)
+include_directories(bench/rlu)
+include_directories(bench/urcu)
 include_directories(basic)
 include_directories(cases)
 include_directories(mwcas)
@@ -78,16 +80,26 @@ if (WITH_UNIT_TESTS)
             tests/unittests/bloom_hashtest.c)
 endif ()
 
-option(WITH_CC_TESTS "build with concurrent control" ON)
-if (WITH_CC_TESTS)
-    set(CC_LIBS
+option(WITH_CC_DBX1K "build with concurrent control" ON)
+if (WITH_CC_DBX1K)
+    set(CC_DB1K_LIBS
             bench/cc/vll.cpp
             bench/misc/wl.cpp
-            bench/small/tpcc_helper.cpp
+            bench/loads/tpcc_helper.cpp
             bench/storage/catalog.cpp
             bench/storage/row.cpp
             bench/storage/table.cpp
             bench/misc/query.cpp)
+endif ()
+
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    option(WITH_DBX1K_TESTS "build with concurrent control" ON)
+    if (WITH_DBX1K_TESTS)
+        set(workolad TPCC)
+        set(CMAKE_CXX_FLAGS "-DNOGRAPHITE=1 -DWORKLOAD=${workload} ${CMAKE_CXX_FLAGS}")
+        set(DBX1K_TESTS
+                bench/db1ktest.cpp)
+    endif ()
 endif ()
 
 option(WITH_LF_TESTS "build with lftests" ON)
@@ -197,6 +209,19 @@ foreach (sourcefile ${MWLF_TESTS_EXES})
             )
     target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD})
 endforeach (sourcefile ${MWLF_TESTS_EXES})
+
+set(DBX1K_TESTS_EXES ${DBX1K_TESTS})
+foreach (sourcefile ${DBX1K_TESTS_EXES})
+    get_filename_component(exename ${sourcefile} NAME_WE)
+    add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile} ${CC_DB1K_LIBS})
+    set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
+            PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
+            EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
+            EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
+            OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
+            )
+    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD} ${CC_DB1K_LIBS})
+endforeach (sourcefile ${DBX1K_TESTS_EXES})
 
 set(BOOST_TESTS_EXES ${BOOST_TESTS})
 foreach (sourcefile ${BOOST_TESTS_EXES})
