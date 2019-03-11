@@ -27,6 +27,7 @@ include_directories(bench/common)
 include_directories(bench/misc)
 include_directories(bench/small)
 include_directories(bench/storage)
+include_directories(bench/storage/index)
 include_directories(basic)
 include_directories(cases)
 include_directories(mwcas)
@@ -85,7 +86,8 @@ if (WITH_CC_TESTS)
             bench/small/tpcc_helper.cpp
             bench/storage/catalog.cpp
             bench/storage/row.cpp
-            bench/storage/table.cpp)
+            bench/storage/table.cpp
+            bench/misc/query.cpp)
 endif ()
 
 option(WITH_LF_TESTS "build with lftests" ON)
