@@ -28,8 +28,16 @@ include_directories(bench/misc)
 include_directories(bench/loads)
 include_directories(bench/storage)
 include_directories(bench/storage/index)
-include_directories(bench/rlu)
-include_directories(bench/urcu)
+include_directories(bench/stm)
+include_directories(bench/stm/rlu)
+include_directories(bench/stm/urcu)
+include_directories(bench/stm/papi)
+include_directories(bench/stm/recordmgr)
+include_directories(bench/stm/brown)
+include_directories(bench/stm/brown/abtree_lf)
+include_directories(bench/stm/descriptors)
+include_directories(bench/stm/rq)
+include_directories(bench/stm/rq/snapcollector)
 include_directories(basic)
 include_directories(cases)
 include_directories(mwcas)
@@ -92,13 +100,26 @@ if (WITH_CC_DBX1K)
             bench/misc/query.cpp)
 endif ()
 
+option(WITH_BROWN_LF "build with brown lockfree structures" ON)
+if (WITH_BROWN_LF)
+    set(BROWN_IF_STRUCT
+            #bench/stm/brown/abtree_lf/brown_abtree_lf_example.cpp)
+            )
+endif ()
+
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     option(WITH_DBX1K_TESTS "build with concurrent control" ON)
     if (WITH_DBX1K_TESTS)
-        set(workolad TPCC)
+        set(workload TPCC)
+        set(cpu_freq_ghz 2.1)
         set(CMAKE_CXX_FLAGS "-DNOGRAPHITE=1 -DWORKLOAD=${workload} ${CMAKE_CXX_FLAGS}")
+        set(CMAKE_CXX_FLAGS "-DCPU_FREQ_GHZ=${cpu_freq_ghz} -DCPU_FREQ=${cpu_freq_ghz} ${CMAKE_CXX_FLAGS}")
         set(DBX1K_TESTS
                 bench/db1ktest.cpp)
+        set(BROWN_TESTS
+                bench/stm/brown/abtree_brown_lf/brown_abtree_lf_example.cpp
+                bench/stm/brown/abtree_brown_rq_lf/brown_abtree_rq_lf_example.cpp
+                bench/stm/rq/snapcollector/snapcollector_test.cpp)
     endif ()
 endif ()
 
@@ -220,7 +241,21 @@ foreach (sourcefile ${DBX1K_TESTS_EXES})
             EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
             OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
             )
-    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD} ${CC_DB1K_LIBS})
+    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD})
+endforeach (sourcefile ${DBX1K_TESTS_EXES})
+
+
+set(BROWN_TESTS_EXES ${BROWN_TESTS})
+foreach (sourcefile ${BROWN_TESTS_EXES})
+    get_filename_component(exename ${sourcefile} NAME_WE)
+    add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile} ${BROWN_IF_STRUCT})
+    set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
+            PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
+            EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
+            EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
+            OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
+            )
+    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD})
 endforeach (sourcefile ${DBX1K_TESTS_EXES})
 
 set(BOOST_TESTS_EXES ${BOOST_TESTS})

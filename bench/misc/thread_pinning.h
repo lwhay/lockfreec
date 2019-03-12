@@ -27,7 +27,7 @@
 #include <iostream>
 #include <stdlib.h>
 #include <string>
-#include "plaf.h"
+#include "bench/stm/plaf.h"
 
 namespace thread_pinning {
 

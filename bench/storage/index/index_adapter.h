@@ -12,7 +12,7 @@
 
 #include <ctime>
 #include "random_fnv1a.h"
-#include "plaf.h"
+#include "bench/stm/plaf.h"
 #include "adapter.h"
 
 //static PAD;
