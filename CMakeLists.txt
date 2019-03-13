@@ -35,6 +35,9 @@ include_directories(bench/stm/papi)
 include_directories(bench/stm/recordmgr)
 include_directories(bench/stm/brown)
 include_directories(bench/stm/brown/abtree_lf)
+include_directories(bench/stm/brown/abtree_brown_rq_lf)
+include_directories(bench/stm/brown/bslack_brown_rq_lf)
+include_directories(bench/stm/brown/bst_brown_rq_lf)
 include_directories(bench/stm/descriptors)
 include_directories(bench/stm/rq)
 include_directories(bench/stm/rq/snapcollector)
@@ -119,6 +122,8 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
         set(BROWN_TESTS
                 bench/stm/brown/abtree_brown_lf/brown_abtree_lf_example.cpp
                 bench/stm/brown/abtree_brown_rq_lf/brown_abtree_rq_lf_example.cpp
+                bench/stm/brown/bslack_brown_rq_lf/brown_bslack_example.cpp
+                bench/stm/brown/bst_brown_rq_lf/brown_bst_rq_lf_example.cpp
                 bench/stm/rq/snapcollector/snapcollector_test.cpp)
     endif ()
 endif ()
