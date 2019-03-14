@@ -18,9 +18,19 @@ typedef struct tree_struct {
     int tid;
 } treeStruct;
 
+long int thread_time[NUM_THREAD];
+
+long int total_time = 0;
+
+long int min_time = (1 << 30);
+
+long int max_time = 0;
+
 void *insertWorker(void *args) {
     treeStruct *ts = (treeStruct *) args;
     struct timeval begin;
+    struct timeval tbegin;
+    gettimeofday(&tbegin, nullptr);
     gettimeofday(&begin, nullptr);
     for (int i = 0; i < (MAX_ELEMENT_NUM / NUM_THREAD); i++) {
         int key = i * NUM_THREAD + ts->tid;
@@ -33,6 +43,9 @@ void *insertWorker(void *args) {
             gettimeofday(&begin, nullptr);
         }
     }
+    struct timeval tend;
+    gettimeofday(&tend, nullptr);
+    thread_time[ts->tid] = (tend.tv_sec - tbegin.tv_sec) * 1000000 + tend.tv_usec - tbegin.tv_usec;
 }
 
 int main(int argc, char **argv) {
@@ -54,5 +67,16 @@ int main(int argc, char **argv) {
         pthread_join(threads[i], NULL);
     }
     tree->printSummary();
+    for (int i = 0; i < NUM_THREAD; i++) {
+        if (max_time < thread_time[i]) {
+            max_time = thread_time[i];
+        }
+        if (min_time > thread_time[i]) {
+            min_time = thread_time[i];
+        }
+        total_time += thread_time[i];
+    }
+    std::cout << "Total: " << MAX_ELEMENT_NUM << " Thread: " << NUM_THREAD << " AVG: " << (total_time / NUM_THREAD)
+              << " MAX: " << max_time << " Min: " << min_time << std::endl;
     return 0;
 }

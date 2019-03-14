@@ -11,26 +11,16 @@
 #include "adapter.h"
 
 #define MAX_ELEMENT_NUM (1 << 20)
-const int NUM_THREAD = 4;
+const int NUM_THREAD = 1;
 
 typedef struct tree_struct {
     ds_adapter<int, void *> *tree;
     int tid;
 } treeStruct;
 
-long int thread_time[NUM_THREAD];
-
-long int total_time = 0;
-
-long int min_time = (1 << 30);
-
-long int max_time = 0;
-
 void *insertWorker(void *args) {
     treeStruct *ts = (treeStruct *) args;
     struct timeval begin;
-    struct timeval tbegin;
-    gettimeofday(&tbegin, nullptr);
     gettimeofday(&begin, nullptr);
     for (int i = 0; i < (MAX_ELEMENT_NUM / NUM_THREAD); i++) {
         int key = i * NUM_THREAD + ts->tid;
@@ -43,17 +33,14 @@ void *insertWorker(void *args) {
             gettimeofday(&begin, nullptr);
         }
     }
-    struct timeval tend;
-    gettimeofday(&tend, nullptr);
-    thread_time[ts->tid] = (tend.tv_sec - tbegin.tv_sec) * 1000000 + tend.tv_usec - tbegin.tv_usec;
 }
 
 int main(int argc, char **argv) {
-    const int KEY_RESERVED = std::numeric_limits<int>::min();
+    const int KEY_ANY = 0;
     const int unused1 = 0;
-    void *const VALUE_RESERVED = NULL;
-    RandomFNV1A *const unused2 = NULL;
-    auto tree = new ds_adapter<int, void *>(NUM_THREAD, KEY_RESERVED, unused1, VALUE_RESERVED, unused2);
+    void *unused2 = NULL;
+    RandomFNV1A *const unused3 = NULL;
+    auto tree = new ds_adapter<int, void *>(NUM_THREAD, KEY_ANY, unused1, unused2, unused3);
 
     pthread_t threads[NUM_THREAD];
     treeStruct tids[NUM_THREAD];
@@ -67,16 +54,5 @@ int main(int argc, char **argv) {
         pthread_join(threads[i], NULL);
     }
     tree->printSummary();
-    for (int i = 0; i < NUM_THREAD; i++) {
-        if (max_time < thread_time[i]) {
-            max_time = thread_time[i];
-        }
-        if (min_time > thread_time[i]) {
-            min_time = thread_time[i];
-        }
-        total_time += thread_time[i];
-    }
-    std::cout << "Total: " << MAX_ELEMENT_NUM << " Thread: " << NUM_THREAD << " AVG: " << (total_time / NUM_THREAD)
-              << " MAX: " << max_time << " Min: " << min_time << std::endl;
     return 0;
 }

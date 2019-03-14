@@ -33,13 +33,27 @@ include_directories(bench/stm/rlu)
 include_directories(bench/stm/urcu)
 include_directories(bench/stm/papi)
 include_directories(bench/stm/recordmgr)
+include_directories(bench/stm/atomic_ops)
+include_directories(bench/stm/atomic_ops/atomic_ops)
+include_directories(bench/stm/atomic_ops/sysdeps)
 include_directories(bench/stm/brown)
 include_directories(bench/stm/brown/abtree_lf)
 include_directories(bench/stm/brown/abtree_brown_rq_lf)
 include_directories(bench/stm/brown/bslack_brown_rq_lf)
 include_directories(bench/stm/brown/bst_brown_rq_lf)
 include_directories(bench/stm/brown/bst_brown_rwlock)
+include_directories(bench/stm/brown/bst_brown_glock)
+include_directories(bench/stm/brown/bst_brown_hohlock)
+include_directories(bench/stm/brown/bst_brown_hohrwlock)
+include_directories(bench/stm/brown/bst_brownson_occ)
+include_directories(bench/stm/brown/bst_drach_lock)
+include_directories(bench/stm/brown/bst_ellen_lf)
+include_directories(bench/stm/brown/bst_guer_ticket)
+include_directories(bench/stm/brown/bst_howley_lf)
+include_directories(bench/stm/brown/bst_natarajan_lf)
+include_directories(bench/stm/brown/bst_rama_lf)
 include_directories(bench/stm/descriptors)
+include_directories(bench/stm/dcss)
 include_directories(bench/stm/rq)
 include_directories(bench/stm/rq/snapcollector)
 include_directories(basic)
@@ -127,9 +141,20 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
                 bench/stm/brown/abtree_brown_rq_lf/brown_abtree_rq_lf_example.cpp
                 bench/stm/brown/abtree_brown_rq_lf/brown_abtree_rq_lf_perf.cpp
                 bench/stm/brown/bslack_brown_rq_lf/brown_bslack_example.cpp
+                bench/stm/brown/bst_brown_ist_lf/brown_ist_lf_perf.cpp
                 bench/stm/brown/bst_brown_rq_lf/brown_bst_rq_lf_example.cpp
                 bench/stm/brown/bst_brown_rq_lf/brown_bst_rq_lf_perf.cpp
                 bench/stm/brown/bst_brown_rwlock/brown_bst_rwlock_perf.cpp
+                bench/stm/brown/bst_brown_glock/brown_bst_glock_perf.cpp
+                bench/stm/brown/bst_brown_hohlock/brown_bst_hohlock_perf.cpp
+                bench/stm/brown/bst_brown_hohrwlock/brown_bst_horwhlock_perf.cpp
+                bench/stm/brown/bst_brownson_occ/brownson_bst_occ_perf.cpp
+                bench/stm/brown/bst_drach_lock/bst_drash_lock_perf.cpp
+                bench/stm/brown/bst_ellen_lf/bst_ellen_lf_perf.cpp
+                bench/stm/brown/bst_guer_ticket/bst_guer_ticket_perf.cpp
+                bench/stm/brown/bst_howley_lf/bst_howley_lf_perf.cpp
+                bench/stm/brown/bst_natarajan_lf/bst_natarajan_lf_perf.cpp
+                bench/stm/brown/bst_rama_lf/bst_rama_lf_perf.cpp
                 #bench/stm/rq/snapcollector/snapcollector_test.cpp
                 )
     endif ()
