@@ -38,6 +38,7 @@ include_directories(bench/stm/brown/abtree_lf)
 include_directories(bench/stm/brown/abtree_brown_rq_lf)
 include_directories(bench/stm/brown/bslack_brown_rq_lf)
 include_directories(bench/stm/brown/bst_brown_rq_lf)
+include_directories(bench/stm/brown/bst_brown_rwlock)
 include_directories(bench/stm/descriptors)
 include_directories(bench/stm/rq)
 include_directories(bench/stm/rq/snapcollector)
@@ -118,13 +119,19 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
         set(CMAKE_CXX_FLAGS "-DNOGRAPHITE=1 -DWORKLOAD=${workload} ${CMAKE_CXX_FLAGS}")
         set(CMAKE_CXX_FLAGS "-DCPU_FREQ_GHZ=${cpu_freq_ghz} -DCPU_FREQ=${cpu_freq_ghz} ${CMAKE_CXX_FLAGS}")
         set(DBX1K_TESTS
-                bench/db1ktest.cpp)
+                #bench/db1ktest.cpp
+                )
         set(BROWN_TESTS
                 bench/stm/brown/abtree_brown_lf/brown_abtree_lf_example.cpp
+                bench/stm/brown/abtree_brown_lf/brown_abtree_lf_perf.cpp
                 bench/stm/brown/abtree_brown_rq_lf/brown_abtree_rq_lf_example.cpp
+                bench/stm/brown/abtree_brown_rq_lf/brown_abtree_rq_lf_perf.cpp
                 bench/stm/brown/bslack_brown_rq_lf/brown_bslack_example.cpp
                 bench/stm/brown/bst_brown_rq_lf/brown_bst_rq_lf_example.cpp
-                bench/stm/rq/snapcollector/snapcollector_test.cpp)
+                bench/stm/brown/bst_brown_rq_lf/brown_bst_rq_lf_perf.cpp
+                bench/stm/brown/bst_brown_rwlock/brown_bst_rwlock_perf.cpp
+                #bench/stm/rq/snapcollector/snapcollector_test.cpp
+                )
     endif ()
 endif ()
 
