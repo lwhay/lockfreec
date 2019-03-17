@@ -109,23 +109,47 @@ endif ()
 option(WITH_CC_DBX1K "build with concurrent control" ON)
 if (WITH_CC_DBX1K)
     set(CC_DB1K_LIBS
-            bench/cc/vll.cpp
+            bench/config.cpp
+            bench/misc/thread_pinning.cpp
+            bench/misc/query.cpp
             bench/misc/wl.cpp
+            bench/misc/thread.cpp
+            bench/misc/parser.cpp
+            bench/misc/helper.cpp
+            bench/misc/global.cpp
+            bench/misc/manager.cpp
+            bench/misc/stats.cpp
+            bench/misc/txn.cpp
+            bench/common/mem_alloc.cpp
+            bench/cc/vll.cpp
+            bench/cc/row_lock.cpp
+            bench/cc/dl_detect.cpp
+            bench/loads/tpcc_txn.cpp
             bench/loads/tpcc_helper.cpp
+            bench/loads/tpcc_query.cpp
+            bench/loads/tpcc_wl.cpp
+            bench/loads/ycsb_query.cpp
+            bench/loads/ycsb_wl.cpp
+            bench/loads/ycsb_txn.cpp
+            bench/loads/test_txn.cpp
             bench/storage/catalog.cpp
             bench/storage/row.cpp
             bench/storage/table.cpp
-            bench/misc/query.cpp)
-endif ()
-
-option(WITH_BROWN_LF "build with brown lockfree structures" ON)
-if (WITH_BROWN_LF)
-    set(BROWN_IF_STRUCT
-            #bench/stm/brown/abtree_lf/brown_abtree_lf_example.cpp)
-            )
+            bench/storage/index/index_hash.cpp)
 endif ()
 
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    set(DL "-ldl")
+    set(JEMALLOC "-L../libs -ljemalloc-5.0.1-25")
+    set(URCU "-L../libs -lurcu")
+    option(WITH_BROWN_LF "build with brown lockfree structures" ON)
+    if (WITH_BROWN_LF)
+        set(BROWN_IF_STRUCT
+                bench/stm/rlu/rlu.cpp
+                #bench/stm/brown/abtree_lf/brown_abtree_lf_example.cpp)
+                )
+    endif ()
+
     option(WITH_DBX1K_TESTS "build with concurrent control" ON)
     if (WITH_DBX1K_TESTS)
         set(workload TPCC)
@@ -133,7 +157,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
         set(CMAKE_CXX_FLAGS "-DNOGRAPHITE=1 -DWORKLOAD=${workload} ${CMAKE_CXX_FLAGS}")
         set(CMAKE_CXX_FLAGS "-DCPU_FREQ_GHZ=${cpu_freq_ghz} -DCPU_FREQ=${cpu_freq_ghz} ${CMAKE_CXX_FLAGS}")
         set(DBX1K_TESTS
-                #bench/db1ktest.cpp
+                bench/db1ktest.cpp
                 )
         set(BROWN_TESTS
                 bench/stm/brown/abtree_brown_lf/brown_abtree_lf_example.cpp
@@ -271,21 +295,20 @@ endforeach (sourcefile ${MWLF_TESTS_EXES})
 set(DBX1K_TESTS_EXES ${DBX1K_TESTS})
 foreach (sourcefile ${DBX1K_TESTS_EXES})
     get_filename_component(exename ${sourcefile} NAME_WE)
-    add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile} ${CC_DB1K_LIBS})
+    add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile} ${CC_DB1K_LIBS} ${BROWN_IF_STRUCT})
     set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
             PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
             EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
             EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
             OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
             )
-    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD})
+    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD} ${DL} ${JEMALLOC} ${URCU})
 endforeach (sourcefile ${DBX1K_TESTS_EXES})
-
 
 set(BROWN_TESTS_EXES ${BROWN_TESTS})
 foreach (sourcefile ${BROWN_TESTS_EXES})
     get_filename_component(exename ${sourcefile} NAME_WE)
-    add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile} ${BROWN_IF_STRUCT})
+    add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile})
     set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
             PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
             EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1

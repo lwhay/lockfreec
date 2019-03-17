@@ -5,6 +5,7 @@
 #ifndef LOCKFREEC_TPCC_CONST_H
 #define LOCKFREEC_TPCC_CONST_H
 
+#if TPCC_SMALL
 enum {
     W_ID,
     W_NAME,
@@ -214,5 +215,6 @@ enum {
     S_REMOTE_CNT,
     S_DATA
 };
+#endif
 
 #endif //LOCKFREEC_TPCC_CONST_H
