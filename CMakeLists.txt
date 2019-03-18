@@ -16,6 +16,8 @@ if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
     find_package(Boost 1.50.0 REQUIRED COMPONENTS date_time filesystem iostreams)
     include_directories(${Boost_INCLUDE_DIR})
     link_directories(${Boost_LIBRARY_DIR})
+    find_package(tbb 1.0 REQUIRED COMPONENTS tbbmalloc tbb tbb_preview)
+    message("Found TBB at: ${TBB_DIR}")
 endif ()
 
 include_directories(.)
@@ -213,10 +215,11 @@ endif ()
 
 find_package(Threads)
 
-option(WITH_BOOST_TESTS "build with tests" ON)
-if (WITH_BOOST_TESTS)
-    set(BOOST_TESTS
-            compare/boost/boostlockfree.cpp
+option(WITH_LFQ_TESTS "build with tests" ON)
+if (WITH_LFQ_TESTS)
+    set(LFQ_TESTS
+            compare/boostlockfree.cpp
+            #compare/tbblockfree.cpp
             )
 endif ()
 
@@ -320,8 +323,8 @@ foreach (sourcefile ${BROWN_TESTS_EXES})
     target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD})
 endforeach (sourcefile ${DBX1K_TESTS_EXES})
 
-set(BOOST_TESTS_EXES ${BOOST_TESTS})
-foreach (sourcefile ${BOOST_TESTS_EXES})
+set(LFQ_TESTS_EXES ${LFQ_TESTS})
+foreach (sourcefile ${LFQ_TESTS_EXES})
     get_filename_component(exename ${sourcefile} NAME_WE)
     add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile})
     set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
@@ -335,7 +338,7 @@ foreach (sourcefile ${BOOST_TESTS_EXES})
     #        add_test(NAME ${exename} COMMAND ${exename}${ARTIFACT_SUFFIX})
     #        add_dependencies(check ${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX})
     #    endif ()
-endforeach (sourcefile ${BOOST_TESTS})
+endforeach (sourcefile ${LFQ_TESTS_EXES})
 
 set(FOSTER_TESTS_EXES ${FOSTER_TESTS})
 foreach (sourcefile ${FOSTER_TESTS_EXES})
