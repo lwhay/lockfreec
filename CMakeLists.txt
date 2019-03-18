@@ -16,9 +16,10 @@ if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
     find_package(Boost 1.50.0 REQUIRED COMPONENTS date_time filesystem iostreams)
     include_directories(${Boost_INCLUDE_DIR})
     link_directories(${Boost_LIBRARY_DIR})
-    find_package(tbb 1.0 REQUIRED COMPONENTS tbbmalloc tbb tbb_preview)
-    message("Found TBB at: ${TBB_DIR}")
 endif ()
+
+find_package(tbb 1.0 REQUIRED COMPONENTS tbbmalloc tbb tbb_preview)
+message("Found TBB at: ${TBB_DIR}")
 
 include_directories(.)
 include_directories(advance)
