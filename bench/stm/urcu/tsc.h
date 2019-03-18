@@ -15,5 +15,4 @@ read_tsc(void) {
     return ((uint64_t) lower) | (((uint64_t) upper) << 32);
 }
 
-
 #endif    /*_TSC_H_*/

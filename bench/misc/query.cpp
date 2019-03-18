@@ -16,8 +16,7 @@
 /*************************************************/
 int Query_queue::_next_tid;
 
-void
-Query_queue::init(workload *h_wl) {
+void Query_queue::init(workload *h_wl) {
     all_queries = new Query_thd *[g_thread_cnt];
     _wl = h_wl;
     _next_tid = 0;
@@ -42,20 +41,17 @@ Query_queue::init(workload *h_wl) {
     printf("Query Queue Init Time %f\n", 1.0 * (end - begin) / 1000000000UL);
 }
 
-void
-Query_queue::init_per_thread(int thread_id) {
+void Query_queue::init_per_thread(int thread_id) {
     all_queries[thread_id] = (Query_thd *) _mm_malloc(sizeof(Query_thd), ALIGNMENT);
     all_queries[thread_id]->init(_wl, thread_id);
 }
 
-base_query *
-Query_queue::get_next_query(uint64_t thd_id) {
+base_query *Query_queue::get_next_query(uint64_t thd_id) {
     base_query *query = all_queries[thd_id]->get_next_query();
     return query;
 }
 
-void *
-Query_queue::threadInitQuery(void *This) {
+void *Query_queue::threadInitQuery(void *This) {
     Query_queue *query_queue = (Query_queue *) This;
     uint32_t tid = ATOM_FETCH_ADD(_next_tid, 1);
     urcu::registerThread(tid);
@@ -75,8 +71,7 @@ Query_queue::threadInitQuery(void *This) {
 //     class Query_thd
 /*************************************************/
 
-void
-Query_thd::init(workload *h_wl, int thread_id) {
+void Query_thd::init(workload *h_wl, int thread_id) {
     uint64_t request_cnt;
     q_idx = 0;
     request_cnt = WARMUP / g_thread_cnt + MAX_TXN_PER_PART + 4;
@@ -98,8 +93,7 @@ Query_thd::init(workload *h_wl, int thread_id) {
     }
 }
 
-base_query *
-Query_thd::get_next_query() {
+base_query *Query_thd::get_next_query() {
     base_query *query = &queries[q_idx++];
     return query;
 }

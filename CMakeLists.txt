@@ -141,8 +141,9 @@ endif ()
 if (CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "CYGWIN")
     message("TM built on ${CMAKE_SYSTEM_NAME}")
     set(DL "-ldl")
-    set(JEMALLOC "-L../libs -ljemalloc-5.0.1-25")
+    set(JEMALLOC "-ljemalloc")
     set(URCU "-L../libs -lurcu")
+    set(PAPI -lpapi)
     option(WITH_BROWN_LF "build with brown lockfree structures" ON)
     if (WITH_BROWN_LF)
         set(BROWN_IF_STRUCT
@@ -155,8 +156,9 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "CYGWIN")
         set(workload TPCC)
         set(cpu_freq_ghz 2.1)
         set(CMAKE_CXX_FLAGS "-DNOGRAPHITE=1 -DWORKLOAD=${workload} ${CMAKE_CXX_FLAGS}")
-        set(CMAKE_CXX_FLAGS "-DCPU_FREQ_GHZ=${cpu_freq_ghz} -DCPU_FREQ=${cpu_freq_ghz} ${CMAKE_CXX_FLAGS}")
+        set(CMAKE_CXX_FLAGS "-DUSE_API -DCPU_FREQ_GHZ=${cpu_freq_ghz} -DCPU_FREQ=${cpu_freq_ghz} ${CMAKE_CXX_FLAGS}")
         set(DBX1K_TESTS
+                bench/db1korigin.cpp
                 bench/db1ktest.cpp
                 )
         set(BROWN_TESTS
@@ -302,7 +304,7 @@ foreach (sourcefile ${DBX1K_TESTS_EXES})
             EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
             OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
             )
-    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD} ${DL} ${JEMALLOC} ${URCU})
+    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD} ${DL} ${JEMALLOC} ${URCU} ${PAPI})
 endforeach (sourcefile ${DBX1K_TESTS_EXES})
 
 set(BROWN_TESTS_EXES ${BROWN_TESTS})
