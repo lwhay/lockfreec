@@ -30,7 +30,6 @@ void *runner(void *id) {
 
 int main(int argc, char *argv[]) {
     parser(argc, argv);
-    mem_allocator.init(g_part_cnt, MEM_SIZE / g_part_cnt);
     cout << g_thr_pinning_policy << endl;
     cout << g_part_alloc << endl;
     cout << g_mem_pad << endl;
@@ -47,5 +46,32 @@ int main(int argc, char *argv[]) {
     cout << g_dl_loop_detect << endl;
     cout << g_ts_batch_alloc << endl;
     cout << g_ts_batch_num << endl;
+    mem_allocator.init(g_part_cnt, MEM_SIZE / g_part_cnt);
+    stats.init();
+    glob_manager = (Manager *) _mm_malloc(sizeof(Manager), 64);
+    glob_manager->init();
+    if (g_cc_alg == DL_DETECT) {
+        dl_detector.init();
+    }
+    workload *m_wl;
+    switch (WORKLOAD) {
+        case YCSB:
+            cout << "ycsb" << endl;
+            m_wl = new ycsb_wl;
+            break;
+        case TPCC:
+            cout << "tpcc" << endl;
+            m_wl = new tpcc_wl;
+            break;
+        case TEST:
+            cout << "test" << endl;
+            m_wl = new TestWorkload;
+            ((TestWorkload *) m_wl)->tick();
+            break;
+        default:
+            assert(false);
+    }
+    m_wl->init();
+    printf("workload initialized!\n");
     return 0;
 }
