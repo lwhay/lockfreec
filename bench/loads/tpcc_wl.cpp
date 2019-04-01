@@ -18,7 +18,8 @@
 
 RC tpcc_wl::init() {
     workload::init();
-    string path = "./benchmarks/";
+    cout << system("pwd") << endl;
+    string path = "../resources/benchmarks/";
 #if TPCC_SMALL
     path += "TPCC_short_schema.txt";
 #else
@@ -438,8 +439,7 @@ void tpcc_wl::init_tab_order(uint64_t did, uint64_t wid) {
 //      j ← random integer such that i ≤ j < n
 //         exchange a[i] and a[j]
 
-void
-tpcc_wl::init_permutation(uint64_t *perm_c_id, uint64_t size, uint64_t wid) {
+void tpcc_wl::init_permutation(uint64_t *perm_c_id, uint64_t size, uint64_t wid) {
     uint32_t i;
     // Init with consecutive values
     for (i = 0; i < size; i++)

@@ -27,7 +27,7 @@ RC ycsb_wl::init() {
     char *cpath = getenv("GRAPHITE_HOME");
     string path;
     if (cpath == NULL)
-        path = "./benchmarks/YCSB_schema.txt";
+        path = "../resources/benchmarks/YCSB_schema.txt";
     else {
         path = string(cpath);
         path += "/tests/apps/dbms/YCSB_schema.txt";
@@ -46,8 +46,7 @@ RC ycsb_wl::init_schema(std::string schema_file) {
     return RCOK;
 }
 
-int
-ycsb_wl::key_to_part(uint64_t key) {
+int ycsb_wl::key_to_part(uint64_t key) {
     uint64_t rows_per_part = g_synth_table_size / g_part_cnt;
     return key / rows_per_part;
 }
@@ -165,10 +164,7 @@ void *ycsb_wl::init_table_slice() {
     assert((UInt32) ATOM_FETCH_ADD(next_tid, 0) == g_init_parallelism);
     uint64_t slice_size = g_synth_table_size / g_init_parallelism;
 
-    for (uint64_t i = slice_size * __tid;
-         i < slice_size * (__tid + 1);
-         i++
-            ) {
+    for (uint64_t i = slice_size * __tid; i < slice_size * (__tid + 1); i++) {
         uint64_t key = perm[i];
         row_t *new_row = NULL;
         uint64_t row_id;
@@ -185,8 +181,7 @@ void *ycsb_wl::init_table_slice() {
             new_row->set_value(fid, value);
         }
 
-        itemid_t *m_item =
-                (itemid_t *) mem_allocator.alloc(sizeof(itemid_t), part_id);
+        itemid_t *m_item = (itemid_t *) mem_allocator.alloc(sizeof(itemid_t), part_id);
         assert(m_item != NULL);
         m_item->type = DT_row;
         m_item->location = new_row;
@@ -204,8 +199,7 @@ void *ycsb_wl::init_table_slice() {
 }
 
 RC ycsb_wl::get_txn_man(txn_man *&txn_manager, thread_t *h_thd) {
-    txn_manager = (ycsb_txn_man *)
-            _mm_malloc(sizeof(ycsb_txn_man), ALIGNMENT);
+    txn_manager = (ycsb_txn_man *) _mm_malloc(sizeof(ycsb_txn_man), ALIGNMENT);
     new(txn_manager) ycsb_txn_man();
     txn_manager->init(h_thd, this, h_thd->get_thd_id());
     return RCOK;
