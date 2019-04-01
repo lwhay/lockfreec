@@ -127,6 +127,18 @@ if (WITH_CC_DBX1K)
             bench/cc/vll.cpp
             bench/cc/row_lock.cpp
             bench/cc/dl_detect.cpp
+            bench/cc/row_mvcc.cpp
+            bench/cc/row_occ.cpp
+            bench/cc/row_ts.cpp
+            bench/cc/row_hekaton.cpp
+            bench/cc/row_silo.cpp
+            bench/cc/row_tictoc.cpp
+            bench/cc/row_vll.cpp
+            bench/cc/occ.cpp
+            bench/cc/ticktoc.cpp
+            bench/cc/silo.cpp
+            bench/cc/hekaton.cpp
+            bench/cc/plock.cpp
             bench/loads/tpcc_txn.cpp
             bench/loads/tpcc_helper.cpp
             bench/loads/tpcc_query.cpp
