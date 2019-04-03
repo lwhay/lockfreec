@@ -246,6 +246,7 @@ option(WITH_PLF_TESTS "build with persistent lf tests" ON)
 if (WITH_PLF_TESTS)
     set(PLF_TESTS
             tests/persisttests/pqueue/MichaelScottQueueTest.cpp
+            tests/persisttests/pqueue/PMichaelScottQueueTest.cpp
             )
 endif ()
 
