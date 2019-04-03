@@ -67,6 +67,8 @@ include_directories(basic)
 include_directories(cases)
 include_directories(mwcas)
 include_directories(mwcas/harris)
+include_directories(persist)
+include_directories(persist/pqueue)
 
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     set(PTHREAD -lpthread)
@@ -240,6 +242,13 @@ if (WITH_LFQ_TESTS)
             )
 endif ()
 
+option(WITH_PLF_TESTS "build with persistent lf tests" ON)
+if (WITH_PLF_TESTS)
+    set(PLF_TESTS
+            tests/persisttests/pqueue/MichaelScottQueueTest.cpp
+            )
+endif ()
+
 option(WITH_FOSTER_TESTS "build with foster tests" ON)
 if (WITH_FOSTER_TESTS)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DSTANDALONE")
@@ -361,6 +370,20 @@ set(FOSTER_TESTS_EXES ${FOSTER_TESTS})
 foreach (sourcefile ${FOSTER_TESTS_EXES})
     get_filename_component(exename ${sourcefile} NAME_WE)
     add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile} sandbox/btrees.h)
+    set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
+            PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
+            EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
+            EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
+            OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
+            )
+    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD})
+endforeach (sourcefile ${FOSTER_TESTS_EXES})
+
+
+set(PERSIST_TESTS_EXES ${PLF_TESTS})
+foreach (sourcefile ${PERSIST_TESTS_EXES})
+    get_filename_component(exename ${sourcefile} NAME_WE)
+    add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile})
     set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
             PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
             EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
