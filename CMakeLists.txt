@@ -19,7 +19,11 @@ if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
 endif ()
 
 find_package(tbb 1.0 REQUIRED COMPONENTS tbbmalloc tbb tbb_preview)
-message("Found TBB at: ${TBB_DIR}")
+if (NOT TBB_FIND_COMPONENTS EQUAL 0)
+    message("-- Found TBB at: ")
+    message("--   ${TBB_FIND_COMPONENTS} found at ${TBB_ROOT}")
+    set(LTBB "-L${TBB_DIR}/../../ -ltbb")
+endif ()
 
 include_directories(.)
 include_directories(advance)
@@ -346,7 +350,7 @@ foreach (sourcefile ${LFQ_TESTS_EXES})
             EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
             OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
             )
-    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${Boost_LIBRARIES} ${PTHREAD})
+    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${Boost_LIBRARIES} ${PTHREAD} ${LTBB})
     #    if (NOT "${exename}" MATCHES "db_sanity_test")
     #        add_test(NAME ${exename} COMMAND ${exename}${ARTIFACT_SUFFIX})
     #        add_dependencies(check ${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX})
