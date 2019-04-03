@@ -5,7 +5,9 @@
 #ifndef LOCKFREEC_MMWCAS_H
 #define LOCKFREEC_MMWCAS_H
 
+#include "gc.h"
 #include "rel_ptr.h"
+#include "pseudoio.h"
 
 #ifdef IS_PMEM
 #define persist     pmem_persist
@@ -13,10 +15,10 @@
 #define persist     mmem_persist
 #endif
 
-#define RDCSS_BIT                        0x8000000000000000
-#define MwCAS_BIT                        0x4000000000000000
-#define DIRTY_BIT                        0x2000000000000000
-#define ADDR_MASK                        0xffffffffffff
+#define RDCSS_BIT                       0x8000000000000000
+#define MwCAS_BIT                       0x4000000000000000
+#define DIRTY_BIT                       0x2000000000000000
+#define ADDR_MASK                       0xffffffffffff
 
 #define ST_UNDECIDED                    0
 #define ST_SUCCESS                      1
@@ -49,6 +51,10 @@ struct word_entry {
 struct mmwcas_entry {
     uint64_t status;
     gc_entry_t gc_entry;
+    mdesc_pool_t mdesc_pool;
+    size_t count;
+    off_t callback;
+    word_entry wdescs[WORD_DESCRIPTOR_SIZE];
 };
 
 #endif //LOCKFREEC_MMWCAS_H

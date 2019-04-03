@@ -232,7 +232,7 @@ option(WITH_LFQ_TESTS "build with tests" ON)
 if (WITH_LFQ_TESTS)
     set(LFQ_TESTS
             compare/boostlockfree.cpp
-            #compare/tbblockfree.cpp
+            compare/tbblockfree.cpp
             )
 endif ()
 

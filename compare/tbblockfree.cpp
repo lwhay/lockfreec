@@ -10,6 +10,8 @@
 #define MAX_THREAD_NUM 40
 #define USE_MOODY_TOKEN 1
 
+using namespace tbb;
+
 void simpleTest() {
     concurrent_queue<int> q;
     struct timeval begin;
@@ -26,7 +28,7 @@ std::stringstream *output;
 struct param_struct {
     int tid;
     int nid;
-    boost::lockfree::queue<int> *q;
+    concurrent_queue<int> *q;
 };
 
 void *simpleWorker(void *args) {
@@ -78,7 +80,7 @@ void concurrentTest(struct param_struct &ps) {
 int main(int argc, char **argv) {
     /*simpleTest();*/
     for (int t = 1; t <= MAX_THREAD_NUM; t++) {
-        boost::lockfree::queue<int> q;
+        concurrent_queue<int> q;
         struct param_struct ps;
         ps.q = &q;
         ps.nid = t;
@@ -87,7 +89,7 @@ int main(int argc, char **argv) {
         int counter = 0;
         struct timeval begin;
         gettimeofday(&begin, nullptr);
-        while (ps.q->pop(v)) counter++;
+        while (ps.q->try_pop(v)) counter++;
         struct timeval end;
         gettimeofday(&end, nullptr);
         std::cout << t << " " << counter << " " << ((end.tv_sec - begin.tv_sec) * 1000000 + end.tv_usec - begin.tv_usec)
