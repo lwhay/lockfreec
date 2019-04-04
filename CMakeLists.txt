@@ -242,7 +242,11 @@ if (WITH_LFQ_TESTS)
             )
 endif ()
 
-option(WITH_PLF_TESTS "build with persistent lf tests" ON)
+if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 5.1)
+    option(WITH_PLF_TESTS "build with persistent lf tests" ON)
+    message("-- GCC Version ${CMAKE_CXX_COMPILER_VERSION}")
+endif ()
+
 if (WITH_PLF_TESTS)
     set(CMAKE_CXX_FLAGS "-DPWB_IS_CLFLUSHHARD ${CMAKE_CXX_FLAGS}")
     set(PLF_TESTS
