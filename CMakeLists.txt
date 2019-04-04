@@ -244,7 +244,7 @@ endif ()
 
 option(WITH_PLF_TESTS "build with persistent lf tests" ON)
 if (WITH_PLF_TESTS)
-    set(CMAKE_CXX_FLAGS "-DPWB_IS_CLFLUSHHARD")
+    set(CMAKE_CXX_FLAGS "-DPWB_IS_CLFLUSHHARD" ${CMAKE_CXX_FLAGS})
     set(PLF_TESTS
             tests/persisttests/pqueue/MichaelScottQueueTest.cpp
             tests/persisttests/pqueue/PMichaelScottQueueTest.cpp
