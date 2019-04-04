@@ -242,9 +242,11 @@ if (WITH_LFQ_TESTS)
             )
 endif ()
 
+message("-- GCC Version ${CMAKE_CXX_COMPILER_VERSION}")
 if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 5.1)
     option(WITH_PLF_TESTS "build with persistent lf tests" ON)
-    message("-- GCC Version ${CMAKE_CXX_COMPILER_VERSION}")
+else ()
+    option(WITH_PLF_TESTS "disable persistent lf tests" OFF)
 endif ()
 
 if (WITH_PLF_TESTS)
