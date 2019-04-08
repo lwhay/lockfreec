@@ -20,7 +20,7 @@ endif ()
 
 find_package(tbb 1.0 REQUIRED COMPONENTS tbbmalloc tbb tbb_preview)
 if (NOT TBB_FIND_COMPONENTS EQUAL 0)
-    message("-- Found TBB at: ")
+    message("-- Found TBB at: ${TBB_DIR}")
     message("--   ${TBB_FIND_COMPONENTS} found at ${TBB_ROOT}")
     set(LTBB "-L${TBB_DIR}/../../ -ltbb")
 endif ()
