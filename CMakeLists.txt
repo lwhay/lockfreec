@@ -221,6 +221,7 @@ if (WITH_MWLF_TESTS)
     set(MWLF_TEST
             tests/mwctests/harris/datatypetest.c)
     set(MWLF_TEST
+            tests/platform/stdcasTest.cpp
             tests/mwctests/harris/valcastest.cpp
             tests/it_moodycqtest.cpp
             tests/it_basiclfqueuetest.cpp
