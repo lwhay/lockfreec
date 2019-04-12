@@ -23,8 +23,11 @@ float pseudoNumber[PSEUDO_NUM];
 
 float *locals;
 
+uint64_t *times;
+
 void initPayload(int thread_num) {
     locals = new float[thread_num];
+    times = new uint64_t[thread_num];
     for (int i = 0; i < PSEUDO_NUM; i++) {
         pseudoNumber[i] = (float) rand() / (1LLU << 31);
     }
@@ -98,7 +101,8 @@ void *dcasWorker(void *args) {
     total_opers.fetch_add(counter, std::memory_order_seq_cst);
     struct timeval end;
     gettimeofday(&end, nullptr);
-    output[tid] << "\t" << tid << " " << ((end.tv_sec - begin.tv_sec) * 1000000 + (end.tv_usec - begin.tv_usec));
+    times[tid] = ((end.tv_sec - begin.tv_sec) * 1000000 + (end.tv_usec - begin.tv_usec));
+    output[tid] << "\t" << tid << " " << times[tid];
 }
 
 void testfloat(int thread_num) {
@@ -112,15 +116,18 @@ void testfloat(int thread_num) {
         pthread_create(&threads[i], nullptr, dcasWorker, &tids[i]);
     }
     float global = .0f;
+    uint64_t total_time = 0;
     for (int i = 0; i < thread_num; i++) {
         pthread_join(threads[i], nullptr);
         global += locals[i];
         string outstr = output[i].str();
         cout << outstr << endl;
+        total_time += times[i];
     }
     struct timeval end;
     gettimeofday(&end, nullptr);
-    cout << total_opers << " " << ((end.tv_sec - begin.tv_sec) * 1000000 + end.tv_usec - begin.tv_usec) << endl;
+    cout << total_opers << " " << ((end.tv_sec - begin.tv_sec) * 1000000 + end.tv_usec - begin.tv_usec) << " "
+         << (float) total_time / thread_num << endl;
     delete[] output;
 }
 
@@ -133,5 +140,6 @@ int main(int argc, char **argv) {
     simpleTest();
     testfloat(thread_num);
     delete locals;
+    delete times;
     return 0;
 }
