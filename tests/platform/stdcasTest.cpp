@@ -20,15 +20,19 @@ atomic<uint64_t> total_opers;
 
 atomic<uint64_t> global_points;
 
-uint64_t local_points[THREAD_NUM];
+uint64_t *local_points;
 
-uint64_t local_others[THREAD_NUM];
+uint64_t *local_others;
 
-void initPayload() {
+int working_thread = -1;
+
+void initPayload(int thread_num) {
+    local_points = new uint64_t[thread_num];
+    local_others = new uint64_t[thread_num];
     global_points = (uint64_t) 0;
-    for (int i = 0; i < THREAD_NUM; i++) {
+    for (int i = 0; i < thread_num; i++) {
         local_points[i] = (uint64_t) i;
-        local_others[i] = (uint64_t) ((i + 1) % THREAD_NUM);
+        local_others[i] = (uint64_t) ((i + 1) % thread_num);
         cout << "i " << i << " " << local_points[i] << " " << local_others[i] << endl;
     }
 }
@@ -40,7 +44,7 @@ void *dcasWorker(void *args) {
     uint64_t self_tries = 0;
     struct timeval begin;
     gettimeofday(&begin, nullptr);
-    for (int i = 0; i < TOTAL_LOAD / THREAD_NUM; i++) {
+    for (int i = 0; i < TOTAL_LOAD / working_thread; i++) {
         do {
 #if TEST_CAS_WEAK
             cas_result = global_points.compare_exchange_weak(local_points[tid], local_others[tid]);
@@ -50,8 +54,8 @@ void *dcasWorker(void *args) {
             self_tries++;
             // For dcas, cas_result denotes whether an exchange operation has been sucessfully enforced by the current thread.
         } while (!cas_result);
-        local_points[tid] = (local_points[tid] + 1) % THREAD_NUM;
-        local_others[tid] = (local_others[tid] + 1) % THREAD_NUM;
+        local_points[tid] = (local_points[tid] + 1) % working_thread;
+        local_others[tid] = (local_others[tid] + 1) % working_thread;
         self_opers++;
         total_opers.fetch_add(1);
     }
@@ -62,7 +66,8 @@ void *dcasWorker(void *args) {
 }
 
 void testDCAS(int thread_num) {
-    initPayload();
+    working_thread = thread_num;
+    initPayload(thread_num);
     output = new stringstream[thread_num];
     pthread_t threads[thread_num];
     int tids[thread_num];
