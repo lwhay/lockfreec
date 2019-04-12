@@ -21,16 +21,18 @@ atomic<uint64_t> total_opers;
 
 float pseudoNumber[PSEUDO_NUM];
 
-float *local;
+float *locals;
 
 void initPayload(int thread_num) {
-    local = new float[thread_num];
+    locals = new float[thread_num];
     for (int i = 0; i < PSEUDO_NUM; i++) {
         pseudoNumber[i] = (float) rand() / (1LLU << 31);
     }
 }
 
 void simpleTest() {
+    struct timeval begin;
+    gettimeofday(&begin, nullptr);
     uint64_t counter = 0;
     float local = .0f;
     for (int i = 0; i < TOTAL_LOAD / PSEUDO_NUM; i++) {
@@ -57,34 +59,37 @@ void simpleTest() {
             counter++;
         }
     }
-    cout << local << " " << counter << endl;
+    struct timeval end;
+    gettimeofday(&end, nullptr);
+    cout << local << " " << counter << " " << ((end.tv_sec - begin.tv_sec) * 1000000 + (end.tv_usec - begin.tv_usec))
+         << endl;
 }
 
 void *dcasWorker(void *args) {
     struct timeval begin;
     gettimeofday(&begin, nullptr);
-    float local = .0f;
     int tid = *((int *) args);
+    locals[tid] = .0f;
     unsigned long long counter = 0;
     for (int i = 0; i < TOTAL_LOAD / PSEUDO_NUM; i++) {
         for (int j = 0; j < PSEUDO_NUM; j++) {
-            if (local > (1LLU << 32)) {
-                local = .0f;
-            } else if (local < -(1 < 30)) {
-                local = .0f;
+            if (locals[tid] > (1LLU << 32)) {
+                locals[tid] = .0f;
+            } else if (locals[tid] < -(1 < 30)) {
+                locals[tid] = .0f;
             }
             switch (j % 4) {
                 case 0:
-                    local += pseudoNumber[j];
+                    locals[tid] += pseudoNumber[j];
                     break;
                 case 1:
-                    local /= pseudoNumber[j];
+                    locals[tid] /= pseudoNumber[j];
                     break;
                 case 2:
-                    local -= pseudoNumber[j];
+                    locals[tid] -= pseudoNumber[j];
                     break;
                 case 3:
-                    local *= pseudoNumber[j];
+                    locals[tid] *= pseudoNumber[j];
                     break;
             }
             counter++;
@@ -93,7 +98,7 @@ void *dcasWorker(void *args) {
     total_opers.fetch_add(counter, std::memory_order_seq_cst);
     struct timeval end;
     gettimeofday(&end, nullptr);
-    output[tid] << tid << " " << ((end.tv_sec - begin.tv_sec) * 1000000 + (end.tv_usec - begin.tv_usec));
+    output[tid] << "\t" << tid << " " << ((end.tv_sec - begin.tv_sec) * 1000000 + (end.tv_usec - begin.tv_usec));
 }
 
 void testfloat(int thread_num) {
@@ -106,8 +111,10 @@ void testfloat(int thread_num) {
         tids[i] = i;
         pthread_create(&threads[i], nullptr, dcasWorker, &tids[i]);
     }
+    float global = .0f;
     for (int i = 0; i < thread_num; i++) {
         pthread_join(threads[i], nullptr);
+        global += locals[i];
         string outstr = output[i].str();
         cout << outstr << endl;
     }
@@ -125,6 +132,6 @@ int main(int argc, char **argv) {
     initPayload(thread_num);
     simpleTest();
     testfloat(thread_num);
-    delete local;
+    delete locals;
     return 0;
 }
