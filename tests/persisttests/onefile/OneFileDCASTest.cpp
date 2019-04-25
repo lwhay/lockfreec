@@ -20,8 +20,8 @@ typedef unsigned long long int atom_t;
 #define TOTAL_LOAD  (1 << 16)
 #define THREAD_NUM  1
 #define TEST_CAS    0
-#define TEST_DCAS   0
-#define TEST_OFDCAS 1
+#define TEST_DCAS   1
+#define TEST_OFDCAS 0
 #define LQ_POINTER  0
 #define LQ_COUNTER  1
 #define LQ_PAC_SIZE 2
