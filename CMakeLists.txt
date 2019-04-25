@@ -68,8 +68,10 @@ include_directories(basic)
 include_directories(cases)
 include_directories(mwcas)
 include_directories(mwcas/harris)
+include_directories(misc)
 include_directories(persist)
 include_directories(persist/pqueue)
+include_directories(persist/onefile)
 
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     set(PTHREAD -lpthread)
@@ -257,6 +259,7 @@ if (WITH_PLF_TESTS)
     set(PLF_TESTS
             tests/persisttests/pqueue/MichaelScottQueueTest.cpp
             tests/persisttests/pqueue/PMichaelScottQueueTest.cpp
+            tests/persisttests/onefile/OneFileDCASTest.cpp
             )
 endif ()
 
