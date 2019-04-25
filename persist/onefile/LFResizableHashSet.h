@@ -21,23 +21,21 @@ class OFLFResizableHashSet {
 
 private:
     struct Node : public oflf::tmbase {
-        oflf::tmtype <K> key;
+        oflf::tmtype<K> key;
         oflf::tmtype<Node *> next{nullptr};
 
         Node(const K &k) : key{k} {} // Copy constructor for k
     };
 
-    oflf::tmtype <uint64_t> capacity;
-    oflf::tmtype <uint64_t> sizeHM = 0;
+    oflf::tmtype<uint64_t> capacity;
+    oflf::tmtype<uint64_t> sizeHM = 0;
     static constexpr double loadFactor = 0.75;
-    oflf::tmtype<oflf::tmtype < Node * >*>
-    buckets;      // An array of pointers to Nodes
+    oflf::tmtype<oflf::tmtype<Node *> *> buckets;      // An array of pointers to Nodes
 
 public:
     OFLFResizableHashSet(int maxThreads = 0, uint64_t capacity = 4) : capacity{capacity} {
         oflf::updateTx([&]() {
-            buckets = (oflf::tmtype < Node * > *)
-            oflf::tmMalloc(capacity * sizeof(oflf::tmtype < Node * > ));
+            buckets = (oflf::tmtype<Node *> *) oflf::tmMalloc(capacity * sizeof(oflf::tmtype<Node *>));
             for (int i = 0; i < capacity; i++) buckets[i] = nullptr;
         });
     }
@@ -62,8 +60,8 @@ public:
         Tracer tracer;
         tracer.startTime();
         uint64_t newcapacity = 2 * capacity;
-        oflf::tmtype < Node * > *newbuckets = (oflf::tmtype < Node * > *)
-        oflf::tmMalloc(newcapacity * sizeof(oflf::tmtype < Node * > ));
+        oflf::tmtype<Node *> *newbuckets = (oflf::tmtype<Node *> *) oflf::tmMalloc(
+                newcapacity * sizeof(oflf::tmtype<Node *>));
         for (int i = 0; i < newcapacity; i++) newbuckets[i] = nullptr;
         for (int i = 0; i < capacity; i++) {
             Node *node = buckets[i];
