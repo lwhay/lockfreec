@@ -23,6 +23,7 @@ typedef unsigned long long int atom_t;
 #define TEST_DCAS   1
 #define TEST_OFDCAS 0
 
+#define MAX_THRNUM  (1 << 8)
 #define TOTAL_LOAD  (1 << 20)
 #define PRINT_TICK  (1 << 4)
 #define THREAD_NUM  2
@@ -30,31 +31,35 @@ typedef unsigned long long int atom_t;
 #define LQ_COUNTER  1
 #define LQ_PAC_SIZE 2
 
+uint64_t total_operations = TOTAL_LOAD;
+
+uint64_t total_threads = THREAD_NUM;
+
 atom_t total_opers = 0;
 
 atom_t total_tries = 0;
 
 atom_t global_points[LQ_PAC_SIZE];
 
-atom_t local_points[THREAD_NUM][LQ_PAC_SIZE];
+atom_t local_points[MAX_THRNUM][LQ_PAC_SIZE];
 
-atom_t local_others[THREAD_NUM][LQ_PAC_SIZE];
+atom_t local_others[MAX_THRNUM][LQ_PAC_SIZE];
 
 void initPayload() {
     global_points[LQ_POINTER] = (atom_t) 0;
     global_points[LQ_COUNTER] = (atom_t) 0;
-    for (int i = 0; i < THREAD_NUM; i++) {
+    for (int i = 0; i < total_threads; i++) {
         local_points[i][LQ_POINTER] = (atom_t) i;
         local_points[i][LQ_COUNTER] = (atom_t) i;
 #if TEST_CAS
         local_others[i][LQ_POINTER] = (atom_t) (i + 1);
         local_others[i][LQ_POINTER] = (atom_t) (i + 1);
 #elif TEST_DCAS
-        local_others[i][LQ_POINTER] = (atom_t) ((i + 1) % THREAD_NUM);
-        local_others[i][LQ_POINTER] = (atom_t) ((i + 1) % THREAD_NUM);
+        local_others[i][LQ_POINTER] = (atom_t) ((i + 1) % total_threads);
+        local_others[i][LQ_POINTER] = (atom_t) ((i + 1) % total_threads);
 #elif TEST_OFDCAS
-        local_others[i][LQ_POINTER] = (atom_t) ((i + 1) % THREAD_NUM);
-        local_others[i][LQ_COUNTER] = (atom_t) ((i + 1) % THREAD_NUM);
+        local_others[i][LQ_POINTER] = (atom_t) ((i + 1) % total_threads);
+        local_others[i][LQ_COUNTER] = (atom_t) ((i + 1) % total_threads);
 #endif
         cout << "i " << i << " " << local_points[i][LQ_POINTER] << " " << local_others[i][LQ_POINTER] << endl;
     }
@@ -71,7 +76,7 @@ void *dcasWorker(void *args) {
     atom_t self_tries = 0;
     Tracer tracer;
     tracer.startTime();
-    for (int i = 0; i < TOTAL_LOAD / THREAD_NUM; i++) {
+    for (int i = 0; i < total_operations / total_threads; i++) {
         do {
 #if TEST_CAS
             cas_result = __sync_val_compare_and_swap(&global_points[LQ_POINTER], local_points[tid][LQ_POINTER],
@@ -95,27 +100,27 @@ void *dcasWorker(void *args) {
             // For __sync_val_compare_and_swap, we cannot guarantee cas_result to be changed by the current thread.
             // Thus, we need to guarantee any two threads result in different exchanged values.
         } while (cas_result != local_points[tid][LQ_POINTER]);
-        local_points[tid][LQ_POINTER] += THREAD_NUM;
-        local_points[tid][LQ_COUNTER] += THREAD_NUM;
-        local_others[tid][LQ_POINTER] += THREAD_NUM;
-        local_others[tid][LQ_COUNTER] += THREAD_NUM;
+        local_points[tid][LQ_POINTER] += total_threads;
+        local_points[tid][LQ_COUNTER] += total_threads;
+        local_others[tid][LQ_POINTER] += total_threads;
+        local_others[tid][LQ_COUNTER] += total_threads;
 #elif TEST_DCAS
             // For dcas, cas_result denotes whether an exchange operation has been sucessfully enforced by the current thread.
         } while (cas_result == 0);
-        local_points[tid][LQ_POINTER] += THREAD_NUM;//= (local_points[tid][LQ_POINTER] + 1) % THREAD_NUM;
-        local_points[tid][LQ_COUNTER] += THREAD_NUM;//= (local_points[tid][LQ_COUNTER] + 1) % THREAD_NUM;
-        local_others[tid][LQ_POINTER] += THREAD_NUM;//= (local_others[tid][LQ_POINTER] + 1) % THREAD_NUM;
-        local_others[tid][LQ_COUNTER] += THREAD_NUM;//= (local_others[tid][LQ_COUNTER] + 1) % THREAD_NUM;
+        local_points[tid][LQ_POINTER] += total_threads;//= (local_points[tid][LQ_POINTER] + 1) % total_threads;
+        local_points[tid][LQ_COUNTER] += total_threads;//= (local_points[tid][LQ_COUNTER] + 1) % total_threads;
+        local_others[tid][LQ_POINTER] += total_threads;//= (local_others[tid][LQ_POINTER] + 1) % total_threads;
+        local_others[tid][LQ_COUNTER] += total_threads;//= (local_others[tid][LQ_COUNTER] + 1) % total_threads;
 #elif TEST_OFDCAS
-            // For dcas, cas_result denotes whether an exchange operation has been sucessfully enforced by the current thread.
-        } while (cas_result == 0);
-        local_points[tid][LQ_POINTER] += THREAD_NUM;//= (local_points[tid][LQ_POINTER] + 1) % THREAD_NUM;
-        local_points[tid][LQ_COUNTER] += THREAD_NUM;//= (local_points[tid][LQ_COUNTER] + 1) % THREAD_NUM;
-        local_others[tid][LQ_POINTER] += THREAD_NUM;//= (local_others[tid][LQ_POINTER] + 1) % THREAD_NUM;
-        local_others[tid][LQ_COUNTER] += THREAD_NUM;//= (local_others[tid][LQ_COUNTER] + 1) % THREAD_NUM;
+        // For dcas, cas_result denotes whether an exchange operation has been sucessfully enforced by the current thread.
+    } while (cas_result == 0);
+    local_points[tid][LQ_POINTER] += total_threads;//= (local_points[tid][LQ_POINTER] + 1) % total_threads;
+    local_points[tid][LQ_COUNTER] += total_threads;//= (local_points[tid][LQ_COUNTER] + 1) % total_threads;
+    local_others[tid][LQ_POINTER] += total_threads;//= (local_others[tid][LQ_POINTER] + 1) % total_threads;
+    local_others[tid][LQ_COUNTER] += total_threads;//= (local_others[tid][LQ_COUNTER] + 1) % total_threads;
 #endif
 #if PRINT_INFO
-        if (self_opers % (TOTAL_LOAD / THREAD_NUM / PRINT_TICK) == 0) {
+        if (self_opers % (total_operations / total_threads / PRINT_TICK) == 0) {
             cout << "\t" << global_points[LQ_COUNTER] << "<->" << global_points[LQ_POINTER] << endl;
         }
 #endif
@@ -128,16 +133,16 @@ void *dcasWorker(void *args) {
 
 void testDCAS() {
     initPayload();
-    output = new stringstream[THREAD_NUM];
-    pthread_t threads[THREAD_NUM];
-    int tids[THREAD_NUM];
+    output = new stringstream[total_threads];
+    pthread_t threads[total_threads];
+    int tids[total_threads];
     Tracer tracer;
     tracer.startTime();
-    for (int i = 0; i < THREAD_NUM; i++) {
+    for (int i = 0; i < total_threads; i++) {
         tids[i] = i;
         pthread_create(&threads[i], nullptr, dcasWorker, &tids[i]);
     }
-    for (int i = 0; i < THREAD_NUM; i++) {
+    for (int i = 0; i < total_threads; i++) {
         pthread_join(threads[i], nullptr);
         string outstr = output[i].str();
         cout << outstr << endl;
@@ -148,6 +153,10 @@ void testDCAS() {
 }
 
 int main(int argc, char **argv) {
+    if (argc >= 2) {
+        total_threads = atoi(argv[1]);
+        total_operations = atoi(argv[2]);
+    }
     testDCAS();
     return 0;
 }
