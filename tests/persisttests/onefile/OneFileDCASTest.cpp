@@ -17,11 +17,11 @@ stringstream *output;
 
 typedef unsigned long long int atom_t;
 
-#define TOTAL_LOAD  (1 << 20)
-#define THREAD_NUM  4
-#define TEST_CAS    1
+#define TOTAL_LOAD  (1 << 16)
+#define THREAD_NUM  1
+#define TEST_CAS    0
 #define TEST_DCAS   0
-#define TEST_OFDCAS 0
+#define TEST_OFDCAS 1
 #define LQ_POINTER  0
 #define LQ_COUNTER  1
 #define LQ_PAC_SIZE 2
@@ -76,8 +76,8 @@ void *dcasWorker(void *args) {
             cas_result = DCAS(global_points, local_points[tid][LQ_POINTER], local_points[tid][LQ_COUNTER],
                               local_others[tid][LQ_POINTER], local_others[tid][LQ_COUNTER]);
 #endif
-            /*cout << tid << " " << global_points[LQ_POINTER] << " " << local_points[tid][LQ_POINTER] << " "
-                 << local_others[tid][LQ_POINTER] << " " << (atom_t) cas_result << endl;*/
+            cout << tid << " " << self_tries << " " << global_points[LQ_POINTER] << " " << local_points[tid][LQ_POINTER]
+                 << " " << local_others[tid][LQ_POINTER] << " " << (atom_t) cas_result << endl;
             self_tries++;
 #if TEST_CAS
             // For __sync_val_compare_and_swap, we cannot guarantee cas_result to be changed by the current thread.
@@ -88,23 +88,22 @@ void *dcasWorker(void *args) {
         local_others[tid][LQ_POINTER] += THREAD_NUM;
         local_others[tid][LQ_COUNTER] += THREAD_NUM;
 #elif TEST_DCAS
-        // For dcas, cas_result denotes whether an exchange operation has been sucessfully enforced by the current thread.
-    } while (cas_result == 0);
-    local_points[tid][LQ_POINTER] = (local_points[tid][LQ_POINTER] + 1) % THREAD_NUM;
-    local_points[tid][LQ_COUNTER] = (local_points[tid][LQ_COUNTER] + 1) % THREAD_NUM;
-    local_others[tid][LQ_POINTER] = (local_others[tid][LQ_POINTER] + 1) % THREAD_NUM;
-    local_others[tid][LQ_COUNTER] = (local_others[tid][LQ_COUNTER] + 1) % THREAD_NUM;
+            // For dcas, cas_result denotes whether an exchange operation has been sucessfully enforced by the current thread.
+        } while (cas_result == 0);
+        local_points[tid][LQ_POINTER] = (local_points[tid][LQ_POINTER] + 1) % THREAD_NUM;
+        local_points[tid][LQ_COUNTER] = (local_points[tid][LQ_COUNTER] + 1) % THREAD_NUM;
+        local_others[tid][LQ_POINTER] = (local_others[tid][LQ_POINTER] + 1) % THREAD_NUM;
+        local_others[tid][LQ_COUNTER] = (local_others[tid][LQ_COUNTER] + 1) % THREAD_NUM;
 #elif TEST_OFDCAS
-        // For dcas, cas_result denotes whether an exchange operation has been sucessfully enforced by the current thread.
-    } while (cas_result == 0);
-    local_points[tid][LQ_POINTER] = (local_points[tid][LQ_POINTER] + 1) % THREAD_NUM;
-    local_points[tid][LQ_COUNTER] = (local_points[tid][LQ_COUNTER] + 1) % THREAD_NUM;
-    local_others[tid][LQ_POINTER] = (local_others[tid][LQ_POINTER] + 1) % THREAD_NUM;
-    local_others[tid][LQ_COUNTER] = (local_others[tid][LQ_COUNTER] + 1) % THREAD_NUM;
+            // For dcas, cas_result denotes whether an exchange operation has been sucessfully enforced by the current thread.
+        } while (cas_result == 0);
+        local_points[tid][LQ_POINTER] = (local_points[tid][LQ_POINTER] + 1) % THREAD_NUM;
+        local_points[tid][LQ_COUNTER] = (local_points[tid][LQ_COUNTER] + 1) % THREAD_NUM;
+        local_others[tid][LQ_POINTER] = (local_others[tid][LQ_POINTER] + 1) % THREAD_NUM;
+        local_others[tid][LQ_COUNTER] = (local_others[tid][LQ_COUNTER] + 1) % THREAD_NUM;
 #endif
-        self_opers++;
-        __sync_fetch_and_add(&total_opers, 1);
     }
+    __sync_fetch_and_add(&total_opers, self_opers);
     output[tid] << tid << ": " << self_opers << " " << self_tries << " " << tracer.getRunTime();
 }
 
