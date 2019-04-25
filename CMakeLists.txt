@@ -260,6 +260,7 @@ if (WITH_PLF_TESTS)
             tests/persisttests/pqueue/MichaelScottQueueTest.cpp
             tests/persisttests/pqueue/PMichaelScottQueueTest.cpp
             tests/persisttests/onefile/OneFileDCASTest.cpp
+            tests/persisttests/onefile/OneFileHashSetLFTest.cpp
             )
 endif ()
 
