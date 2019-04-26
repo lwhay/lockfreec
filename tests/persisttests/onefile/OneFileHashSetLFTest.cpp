@@ -3,13 +3,16 @@
 //
 
 #include <iostream>
+#include <sstream>
 #include "LFResizableHashSet.h"
 
 #define TOTAL_COUNT   (1 << 20)
 
-#define QUERY_COUNT   (1 << 10)
+#define QUERY_COUNT   (1 << 7)
 
 #define THREAD_NUBMER 4
+
+long total_time;
 
 uint64_t exists = 0;
 
@@ -22,6 +25,8 @@ uint64_t total_count = TOTAL_COUNT;
 int thread_number = THREAD_NUBMER;
 
 OFLFResizableHashSet<uint64_t> *set;
+
+stringstream *output;
 
 struct target {
     int tid;
@@ -52,8 +57,10 @@ void *insertWorker(void *args) {
 }
 
 void *updateWorker(void *args) {
+    Tracer tracer;
+    tracer.startTime();
     struct target *work = (struct target *) args;
-    cout << "Updater " << work->tid << endl;
+    //cout << "Updater " << work->tid << endl;
     uint64_t hit = 0;
     uint64_t fail = 0;
     for (int i = work->tid; i < total_count; i += thread_number) {
@@ -64,6 +71,9 @@ void *updateWorker(void *args) {
             }
         }
     }
+    long elipsed = tracer.getRunTime();
+    output[work->tid] << work->tid << " " << elipsed << endl;
+    __sync_fetch_and_add(&total_time, elipsed);
     __sync_fetch_and_add(&update, hit);
     __sync_fetch_and_add(&failure, fail);
 }
@@ -86,6 +96,8 @@ void multiWorkers() {
     }
     for (int i = 0; i < thread_number; i++) {
         pthread_join(workers[i], nullptr);
+        string outstr = output[i].str();
+        cout << outstr;
     }
     cout << "Gathering ..." << endl;
 }
@@ -96,6 +108,7 @@ int main(int argc, char **argv) {
         thread_number = atoi(argv[1]);
         total_count = atoi(argv[2]);
     }
+    output = new stringstream[thread_number];
     set = new OFLFResizableHashSet<uint64_t>(thread_number);
     Tracer tracer;
     tracer.startTime();
@@ -105,6 +118,7 @@ int main(int argc, char **argv) {
     multiWorkers();
     long ut = tracer.getRunTime();
     cout << "IT " << it << " ut " << ut << " dupinst " << exists << " tryupd " << update << " failinst " << failure
-         << endl;
+         << " avgtpt " << (double) total_count * 1000000 * thread_number / total_time << endl;
     delete set;
+    delete[] output;
 }
