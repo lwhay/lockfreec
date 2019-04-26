@@ -11,7 +11,13 @@
 
 #define THREAD_NUBMER 4
 
-#define SINGLE_INSERT 0
+uint64_t exists = 0;
+
+uint64_t update = 0;
+
+uint64_t failure = 0;
+
+OFLFResizableHashSet<uint64_t> set(THREAD_NUBMER);
 
 struct target {
     int tid;
@@ -19,7 +25,6 @@ struct target {
 };
 
 void simpleInsert() {
-    OFLFResizableHashSet<uint64_t> set;
     for (int i = 0; i < TOTAL_COUNT; i++) {
         set.add(i);
     }
@@ -33,15 +38,36 @@ void simpleInsert() {
 
 void *insertWorker(void *args) {
     struct target *work = (struct target *) args;
+    uint64_t fail = 0;
     for (int i = work->tid; i < TOTAL_COUNT; i += THREAD_NUBMER) {
-        work->set->add(i);
+        if (!work->set->add(i, work->tid)) {
+            fail++;
+        }
     }
+    __sync_fetch_and_add(&exists, fail);
 }
 
-void multiInsert() {
+void *updateWorker(void *args) {
+    struct target *work = (struct target *) args;
+    cout << "Updater " << work->tid << endl;
+    uint64_t hit = 0;
+    uint64_t fail = 0;
+    for (int i = work->tid; i < TOTAL_COUNT; i += THREAD_NUBMER) {
+        if (work->set->remove(i, work->tid)) {
+            hit++;
+            if (!work->set->add(i, work->tid)) {
+                fail++;
+            }
+        }
+    }
+    __sync_fetch_and_add(&update, hit);
+    __sync_fetch_and_add(&failure, fail);
+}
+
+void multiWorkers() {
     pthread_t workers[THREAD_NUBMER];
-    OFLFResizableHashSet<uint64_t> set;
     struct target parms[THREAD_NUBMER];
+    cout << endl << "Re-inserting ..." << endl;
     for (int i = 0; i < THREAD_NUBMER; i++) {
         parms[i].tid = i;
         parms[i].set = &set;
@@ -50,12 +76,24 @@ void multiInsert() {
     for (int i = 0; i < THREAD_NUBMER; i++) {
         pthread_join(workers[i], nullptr);
     }
+    cout << "Updating ..." << endl;
+    for (int i = 0; i < THREAD_NUBMER; i++) {
+        pthread_create(&workers[i], nullptr, updateWorker, &parms[i]);
+    }
+    for (int i = 0; i < THREAD_NUBMER; i++) {
+        pthread_join(workers[i], nullptr);
+    }
+    cout << "Gathering ..." << endl;
 }
 
 int main(int argc, char **argv) {
-#if SINGLE_INSERT
+    Tracer tracer;
+    tracer.startTime();
     simpleInsert();
-#else
-    multiInsert();
-#endif
+    long it = tracer.getRunTime();
+    tracer.startTime();
+    multiWorkers();
+    long ut = tracer.getRunTime();
+    cout << "IT " << it << " ut " << ut << " dupinst " << exists << " tryupd " << update << " failinst " << failure
+         << endl;
 }
