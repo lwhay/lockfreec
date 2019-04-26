@@ -15,9 +15,14 @@ using namespace oflf;
 
 stringstream *output;
 
+stringstream *failure;
+
+stringstream *trdinf;
+
 typedef unsigned long long int atom_t;
 
 #define PRINT_INFO  0
+#define PRINT_FAIL  0
 
 #define TEST_CAS    0
 #define TEST_DCAS   1
@@ -87,12 +92,12 @@ void *dcasWorker(void *args) {
             cas_result = DCAS(global_points, global_points[LQ_POINTER], global_points[LQ_COUNTER],
                               local_others[tid][LQ_POINTER], local_others[tid][LQ_COUNTER]);
 #endif
-#if PRINT_INFO
+#if PRINT_FAIL
             if (TEST_CAS && (cas_result != local_points[tid][LQ_POINTER]) || cas_result == 0) {
-                cout << tid << " " << self_tries << " " << global_points[LQ_POINTER] << " " << global_points[LQ_COUNTER]
-                     << " " << local_points[tid][LQ_POINTER] << " " << local_points[tid][LQ_COUNTER] << " "
-                     << local_others[tid][LQ_POINTER] << " " << local_others[tid][LQ_COUNTER] << " "
-                     << (atom_t) cas_result << endl;
+                failure[tid] << tid << " " << self_tries << " " << global_points[LQ_POINTER] << " "
+                            << global_points[LQ_COUNTER] << " " << local_points[tid][LQ_POINTER] << " "
+                            << local_points[tid][LQ_COUNTER] << " " << local_others[tid][LQ_POINTER] << " "
+                            << local_others[tid][LQ_COUNTER] << " " << (atom_t) cas_result << endl;
             }
 #endif
             self_tries++;
@@ -107,6 +112,14 @@ void *dcasWorker(void *args) {
 #elif TEST_DCAS
             // For dcas, cas_result denotes whether an exchange operation has been sucessfully enforced by the current thread.
         } while (cas_result == 0);
+#if PRINT_INFO
+        // Need to be augured, whether the atomic cas is really atomic when comparing two GLOBAL numbers.
+        if (!__sync_bool_compare_and_swap(&global_points[LQ_POINTER], global_points[LQ_COUNTER],
+                                          global_points[LQ_POINTER])) {
+            output[tid] << "\033[1;31m" << "\t" << tid << ":" << global_points[LQ_POINTER] << ":"
+                        << global_points[LQ_COUNTER] << "\033[0m" << endl;
+        }
+#endif
         local_points[tid][LQ_POINTER] += total_threads;//= (local_points[tid][LQ_POINTER] + 1) % total_threads;
         local_points[tid][LQ_COUNTER] += total_threads;//= (local_points[tid][LQ_COUNTER] + 1) % total_threads;
         local_others[tid][LQ_POINTER] += total_threads;//= (local_others[tid][LQ_POINTER] + 1) % total_threads;
@@ -119,21 +132,18 @@ void *dcasWorker(void *args) {
     local_others[tid][LQ_POINTER] += total_threads;//= (local_others[tid][LQ_POINTER] + 1) % total_threads;
     local_others[tid][LQ_COUNTER] += total_threads;//= (local_others[tid][LQ_COUNTER] + 1) % total_threads;
 #endif
-#if PRINT_INFO
-        if (self_opers % (total_operations / total_threads / PRINT_TICK) == 0) {
-            cout << "\t" << global_points[LQ_COUNTER] << "<->" << global_points[LQ_POINTER] << endl;
-        }
-#endif
         self_opers++;
     }
     __sync_fetch_and_add(&total_opers, self_opers);
     __sync_fetch_and_add(&total_tries, self_tries);
-    output[tid] << tid << ": " << self_opers << " " << self_tries << " " << tracer.getRunTime();
+    trdinf[tid] << tid << ": " << self_opers << " " << self_tries << " " << tracer.getRunTime() << endl;
 }
 
 void testDCAS() {
     initPayload();
     output = new stringstream[total_threads];
+    failure = new stringstream[total_threads];
+    trdinf = new stringstream[total_threads];
     pthread_t threads[total_threads];
     int tids[total_threads];
     Tracer tracer;
@@ -145,11 +155,21 @@ void testDCAS() {
     for (int i = 0; i < total_threads; i++) {
         pthread_join(threads[i], nullptr);
         string outstr = output[i].str();
-        cout << outstr << endl;
+        cout << outstr;
+    }
+    for (int i = 0; i < total_threads; i++) {
+        string outstr = failure[i].str();
+        cout << outstr;
+    }
+    for (int i = 0; i < total_threads; i++) {
+        string outstr = trdinf[i].str();
+        cout << outstr;
     }
     cout << "opers: " << total_opers << " tries: " << total_tries << " time: " << tracer.getRunTime() << " global: "
          << global_points[LQ_POINTER] << "<->" << global_points[LQ_COUNTER] << endl;
     delete[] output;
+    delete[] failure;
+    delete[] trdinf;
 }
 
 int main(int argc, char **argv) {

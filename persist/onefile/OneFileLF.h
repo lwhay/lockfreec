@@ -28,7 +28,7 @@ namespace oflf {
 // Maximum number of stores in the WriteSet per transaction
     static const uint64_t TX_MAX_STORES = 10 * 1024;
 // Number of buckets in the hashmap of the WriteSet.
-    static const uint64_t HASH_BUCKETS = 1024;
+    static const uint64_t HASH_BUCKETS = 1024 * 1024;
 // Maximum number of allocations in one transaction
     static const uint64_t TX_MAX_ALLOCS = 10 * 1024;
 // Maximum number of deallocations in one transaction
