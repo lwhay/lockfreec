@@ -17,7 +17,11 @@ uint64_t update = 0;
 
 uint64_t failure = 0;
 
-OFLFResizableHashSet<uint64_t> set(THREAD_NUBMER);
+uint64_t total_count = TOTAL_COUNT;
+
+int thread_number = THREAD_NUBMER;
+
+OFLFResizableHashSet<uint64_t> *set;
 
 struct target {
     int tid;
@@ -25,12 +29,12 @@ struct target {
 };
 
 void simpleInsert() {
-    for (int i = 0; i < TOTAL_COUNT; i++) {
-        set.add(i);
+    for (int i = 0; i < total_count; i++) {
+        set->add(i);
     }
-    for (int i = 0; i < TOTAL_COUNT; i += (TOTAL_COUNT / QUERY_COUNT)) {
-        cout << set.contains(i);
-        if (i / (TOTAL_COUNT / QUERY_COUNT) % 32 == 0) {
+    for (int i = 0; i < total_count; i += (total_count / QUERY_COUNT)) {
+        cout << set->contains(i);
+        if (i / (total_count / QUERY_COUNT) % 32 == 0) {
             cout << endl;
         }
     }
@@ -39,7 +43,7 @@ void simpleInsert() {
 void *insertWorker(void *args) {
     struct target *work = (struct target *) args;
     uint64_t fail = 0;
-    for (int i = work->tid; i < TOTAL_COUNT; i += THREAD_NUBMER) {
+    for (int i = work->tid; i < total_count; i += thread_number) {
         if (!work->set->add(i, work->tid)) {
             fail++;
         }
@@ -52,7 +56,7 @@ void *updateWorker(void *args) {
     cout << "Updater " << work->tid << endl;
     uint64_t hit = 0;
     uint64_t fail = 0;
-    for (int i = work->tid; i < TOTAL_COUNT; i += THREAD_NUBMER) {
+    for (int i = work->tid; i < total_count; i += thread_number) {
         if (work->set->remove(i, work->tid)) {
             hit++;
             if (!work->set->add(i, work->tid)) {
@@ -65,28 +69,33 @@ void *updateWorker(void *args) {
 }
 
 void multiWorkers() {
-    pthread_t workers[THREAD_NUBMER];
-    struct target parms[THREAD_NUBMER];
+    pthread_t workers[thread_number];
+    struct target parms[thread_number];
     cout << endl << "Re-inserting ..." << endl;
-    for (int i = 0; i < THREAD_NUBMER; i++) {
+    for (int i = 0; i < thread_number; i++) {
         parms[i].tid = i;
-        parms[i].set = &set;
+        parms[i].set = set;
         pthread_create(&workers[i], nullptr, insertWorker, &parms[i]);
     }
-    for (int i = 0; i < THREAD_NUBMER; i++) {
+    for (int i = 0; i < thread_number; i++) {
         pthread_join(workers[i], nullptr);
     }
     cout << "Updating ..." << endl;
-    for (int i = 0; i < THREAD_NUBMER; i++) {
+    for (int i = 0; i < thread_number; i++) {
         pthread_create(&workers[i], nullptr, updateWorker, &parms[i]);
     }
-    for (int i = 0; i < THREAD_NUBMER; i++) {
+    for (int i = 0; i < thread_number; i++) {
         pthread_join(workers[i], nullptr);
     }
     cout << "Gathering ..." << endl;
 }
 
 int main(int argc, char **argv) {
+    if (argc == 2) {
+        thread_number = atoi(argv[1]);
+        total_count = atoi(argv[2]);
+    }
+    set = new OFLFResizableHashSet<uint64_t>(thread_number);
     Tracer tracer;
     tracer.startTime();
     simpleInsert();
@@ -96,4 +105,5 @@ int main(int argc, char **argv) {
     long ut = tracer.getRunTime();
     cout << "IT " << it << " ut " << ut << " dupinst " << exists << " tryupd " << update << " failinst " << failure
          << endl;
+    delete set;
 }
