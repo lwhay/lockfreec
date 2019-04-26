@@ -91,7 +91,7 @@ void multiWorkers() {
 }
 
 int main(int argc, char **argv) {
-    if (argc == 2) {
+    if (argc == 3) {
         cout << "Parameters " << argc << endl;
         thread_number = atoi(argv[1]);
         total_count = atoi(argv[2]);
