@@ -12,6 +12,8 @@
 
 #define THREAD_NUBMER 4
 
+#define TEST_LOOKUP   1
+
 long total_time;
 
 uint64_t exists = 0;
@@ -56,7 +58,7 @@ void *insertWorker(void *args) {
     __sync_fetch_and_add(&exists, fail);
 }
 
-void *updateWorker(void *args) {
+void *measureWorker(void *args) {
     Tracer tracer;
     tracer.startTime();
     struct target *work = (struct target *) args;
@@ -64,12 +66,20 @@ void *updateWorker(void *args) {
     uint64_t hit = 0;
     uint64_t fail = 0;
     for (int i = work->tid; i < total_count; i += thread_number) {
+#if TEST_LOOKUP
+        if (work->set->contains(i, work->tid)) {
+            hit++;
+        } else {
+            fail++;
+        }
+#else
         if (work->set->remove(i, work->tid)) {
             hit++;
             if (!work->set->add(i, work->tid)) {
                 fail++;
             }
         }
+#endif
     }
     long elipsed = tracer.getRunTime();
     output[work->tid] << work->tid << " " << elipsed << endl;
@@ -90,9 +100,9 @@ void multiWorkers() {
     for (int i = 0; i < thread_number; i++) {
         pthread_join(workers[i], nullptr);
     }
-    cout << "Updating ..." << endl;
+    cout << "Measuring ..." << endl;
     for (int i = 0; i < thread_number; i++) {
-        pthread_create(&workers[i], nullptr, updateWorker, &parms[i]);
+        pthread_create(&workers[i], nullptr, measureWorker, &parms[i]);
     }
     for (int i = 0; i < thread_number; i++) {
         pthread_join(workers[i], nullptr);
