@@ -150,7 +150,6 @@ namespace oflf {
         uint64_t delEra_{0};        // Filled by tmDelete() or tmFree()
     };
 
-
 // One entry in the log of allocations (not used for retires like in the WF version).
 // In case the transactions aborts, we can rollback our allocations, hiding the type information inside the lambda.
 // Sure, we could keep everything in std::function, but this uses less memory.
