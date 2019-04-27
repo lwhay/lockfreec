@@ -19,11 +19,13 @@ if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
     link_directories(/usr/local/lib)
 endif ()
 
-find_package(tbb 1.0 REQUIRED COMPONENTS tbbmalloc tbb tbb_preview)
-if (NOT TBB_FIND_COMPONENTS EQUAL 0)
-    message("-- Found TBB at: ${TBB_DIR}")
-    message("--   ${TBB_FIND_COMPONENTS} found at ${TBB_ROOT}")
-    set(LTBB "-L${TBB_DIR}/../../ -ltbb")
+if (NOT CMAKE_SYSTEM_NAME MATCHES "CYGWIN")
+    find_package(tbb 1.0 REQUIRED COMPONENTS tbbmalloc tbb tbb_preview)
+    if (NOT TBB_FIND_COMPONENTS EQUAL 0)
+        message("-- Found TBB at: ${TBB_DIR}")
+        message("--   ${TBB_FIND_COMPONENTS} found at ${TBB_ROOT}")
+        set(LTBB "-L${TBB_DIR}/../../ -ltbb")
+    endif ()
 endif ()
 
 include_directories(.)
@@ -243,8 +245,12 @@ option(WITH_LFQ_TESTS "build with tests" ON)
 if (WITH_LFQ_TESTS)
     set(LFQ_TESTS
             compare/boostlockfree.cpp
-            compare/tbblockfree.cpp
             )
+    if (NOT CMAKE_SYSTEM_NAME MATCHES "CYGWIN")
+        set(LFQ_TESTS
+                compare/tbblockfree.cpp
+                ${LFQ_TESTS})
+    endif ()
 endif ()
 
 message("-- GCC Version ${CMAKE_CXX_COMPILER_VERSION}")
