@@ -4,7 +4,7 @@
 
 #include <iostream>
 #include <sstream>
-#include "LFResizableHashSet.h"
+#include "WFResizableHashSet.h"
 
 #define TOTAL_COUNT   (1 << 20)
 
@@ -24,13 +24,13 @@ uint64_t total_count = TOTAL_COUNT;
 
 int thread_number = THREAD_NUBMER;
 
-OFLFResizableHashSet<uint64_t> *set;
+OFWFResizableHashSet<uint64_t> *set;
 
 stringstream *output;
 
 struct target {
     int tid;
-    OFLFResizableHashSet<uint64_t> *set;
+    OFWFResizableHashSet<uint64_t> *set;
 };
 
 void simpleInsert() {
@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
         total_count = atoi(argv[2]);
     }
     output = new stringstream[thread_number];
-    set = new OFLFResizableHashSet<uint64_t>(thread_number);
+    set = new OFWFResizableHashSet<uint64_t>(thread_number);
     Tracer tracer;
     tracer.startTime();
     simpleInsert();

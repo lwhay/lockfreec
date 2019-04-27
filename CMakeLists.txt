@@ -261,6 +261,7 @@ if (WITH_PLF_TESTS)
             tests/persisttests/pqueue/PMichaelScottQueueTest.cpp
             tests/persisttests/onefile/OneFileDCASTest.cpp
             tests/persisttests/onefile/OneFileHashSetLFTest.cpp
+            tests/persisttests/onefile/OneFileHashSetWFTest.cpp
             )
 endif ()
 
