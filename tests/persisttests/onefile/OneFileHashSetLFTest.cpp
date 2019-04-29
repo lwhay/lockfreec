@@ -12,7 +12,7 @@
 
 #define THREAD_NUBMER 4
 
-#define TEST_LOOKUP   1
+#define TEST_LOOKUP   0
 
 long total_time;
 
@@ -65,7 +65,7 @@ void *measureWorker(void *args) {
     //cout << "Updater " << work->tid << endl;
     uint64_t hit = 0;
     uint64_t fail = 0;
-    for (int i = work->tid; i < total_count; i += thread_number) {
+    for (int i = work->tid; i < total_count; i++ /*+= thread_number*/) {
 #if TEST_LOOKUP
         if (work->set->contains(i, work->tid)) {
             hit++;
@@ -97,6 +97,7 @@ void multiWorkers() {
         parms[i].set = set;
         pthread_create(&workers[i], nullptr, insertWorker, &parms[i]);
     }
+    oflf::gOFLF.debug = true;
     for (int i = 0; i < thread_number; i++) {
         pthread_join(workers[i], nullptr);
     }
@@ -109,6 +110,7 @@ void multiWorkers() {
         string outstr = output[i].str();
         cout << outstr;
     }
+    oflf::gOFLF.debug = false;
     cout << "Gathering ..." << endl;
 }
 

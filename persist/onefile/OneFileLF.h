@@ -26,9 +26,9 @@ namespace oflf {
 // Maximum number of registered threads that can execute transactions
     static const int REGISTRY_MAX_THREADS = 128;
 // Maximum number of stores in the WriteSet per transaction
-    static const uint64_t TX_MAX_STORES = 3 * 1024 * 1024;
+    static const uint64_t TX_MAX_STORES = 3 /** 1024*/ * 1024;
 // Number of buckets in the hashmap of the WriteSet.
-    static const uint64_t HASH_BUCKETS = 1 * 1024 * 1024;
+    static const uint64_t HASH_BUCKETS = 1 /** 1024*/ * 1024;
 // Maximum number of allocations in one transaction
     static const uint64_t TX_MAX_ALLOCS = 10 * 1024;
 // Maximum number of deallocations in one transaction
@@ -407,11 +407,11 @@ namespace oflf {
  */
     class OneFileLF {
     private:
-        static const bool debug = false;
         HazardErasOF he{};
         OpData *opData;
 
     public:
+        /*static const*/ bool debug = false;
         std::atomic<uint64_t> pad0[16];  // two cache lines of padding, before and after curTx
         std::atomic<uint64_t> curTx{seqidx2trans(1, 0)};
         std::atomic<uint64_t> pad1[15];
