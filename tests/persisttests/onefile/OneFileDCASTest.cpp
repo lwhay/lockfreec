@@ -7,11 +7,8 @@
 #include <random>
 #include "tracer.h"
 #include "lf_basic.h"
-#include "OneFileLF.h"
 
 using namespace std;
-
-using namespace oflf;
 
 stringstream *output;
 
@@ -28,6 +25,11 @@ typedef unsigned long long int atom_t;
 #define TEST_CAS    0
 #define TEST_DCAS   0
 #define TEST_OFDCAS 0
+
+#if TEST_OFDCAS
+#include "OneFileLF.h"
+using namespace oflf;
+#endif
 
 #define MAX_THRNUM  (1 << 8)
 #define TOTAL_LOAD  (1 << 20)
