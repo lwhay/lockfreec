@@ -30,9 +30,9 @@ namespace oflf {
 // Number of buckets in the hashmap of the WriteSet.
     static const uint64_t HASH_BUCKETS = 1 /** 1024*/ * 1024;
 // Maximum number of allocations in one transaction
-    static const uint64_t TX_MAX_ALLOCS = 10 * 1024;
+    static const uint64_t TX_MAX_ALLOCS = 20;
 // Maximum number of deallocations in one transaction
-    static const uint64_t TX_MAX_RETIRES = 10 * 1024;
+    static const uint64_t TX_MAX_RETIRES = 20;
 
 // DCAS / CAS2 macro
 #define DCAS(ptr, o1, o2, n1, n2)                               \
@@ -434,7 +434,7 @@ namespace oflf {
         void beginTx(OpData &myopd, const int tid) {
             tl_is_read_only = true;
             // Clear the logs of the previous transaction
-            deleteAllocsFromLog(myopd);
+            deleteAllocsFromLog(myopd, tid, curTx.load(std::memory_order_acquire));
             myopd.numRetires = 0;
             while (true) {
                 myopd.curTx = curTx.load(std::memory_order_acquire);
@@ -455,17 +455,28 @@ namespace oflf {
             // If it's a read-only transaction, then commit immediately
             if (writeSets[tid].numStores == 0 && myopd.numRetires == 0) return true;
             // Give up if the currTx has changed sinced our transaction started
-            if (myopd.curTx != curTx.load(std::memory_order_acquire)) return false;
+            if (myopd.curTx != curTx.load(std::memory_order_acquire)) {
+                if (debug)
+                    printf("\t\tRetry path 1 tid %d by %d %d\n", tid, trans2seq(myopd.curTx),
+                           curTx.load(std::memory_order_acquire));
+                return false;
+            }
             // Move our request to OPEN, using the sequence of the previous transaction +1
             uint64_t seq = trans2seq(myopd.curTx);
             uint64_t newTx = seqidx2trans(seq + 1, tid);
             myopd.request.store(newTx, std::memory_order_release);
             // Attempt to CAS currTx to our OpDesc instance (tid) incrementing the seq in it
             uint64_t lcurrTx = myopd.curTx;
+            uint64_t oldTx = lcurrTx;
             if (debug)
                 printf("tid=%i  attempting CAS on curTx from (%ld,%ld) to (%ld,%ld)\n", tid, trans2seq(lcurrTx),
                        trans2idx(lcurrTx), seq + 1, (uint64_t) tid);
-            if (!curTx.compare_exchange_strong(lcurrTx, newTx)) return false;
+            if (!curTx.compare_exchange_strong(lcurrTx, newTx)) {
+                if (debug)
+                    printf("\t\tRetry path 2 tid %d by %d %d %d\n", tid, trans2seq(oldTx), trans2seq(lcurrTx),
+                           trans2seq(newTx));
+                return false;
+            }
             // Execute each store in the write-set using DCAS() and close the request
             helpApply(newTx, tid);
             retireRetiresFromLog(myopd, tid);
@@ -490,9 +501,11 @@ namespace oflf {
                 try {
                     retval = func();
                 } catch (AbortedTx &) {
+                    if (debug) printf("\t\tAborted %d %d\n", tid, trans2seq(myopd.curTx));
                     continue;
                 }
                 if (commitTx(myopd, tid)) break;
+                else if (debug) printf("\t\tRetry tid %d %d\n", tid, trans2seq(myopd.curTx));
             }
             tl_opdata = nullptr;
             --myopd.nestedTrans;
@@ -644,10 +657,13 @@ namespace oflf {
         }
 
         // This is called when the transaction fails, to undo all the allocations done during the transaction
-        void deleteAllocsFromLog(OpData &myopd) {
+        void deleteAllocsFromLog(OpData &myopd, int tid, int newTx) {
             for (unsigned i = 0; i < myopd.numAllocs; i++) {
                 myopd.alog[i].reclaim(myopd.alog[i].obj);
             }
+            if (debug)
+                printf("\tDeleting transaction (%d, %d) from log %d %d %d\n", tid, trans2seq(myopd.curTx),
+                       myopd.numAllocs, myopd.curTx, trans2seq(newTx));
             myopd.numAllocs = 0;
         }
 

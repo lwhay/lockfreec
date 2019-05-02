@@ -97,11 +97,11 @@ void multiWorkers() {
         parms[i].set = set;
         pthread_create(&workers[i], nullptr, insertWorker, &parms[i]);
     }
-    oflf::gOFLF.debug = true;
     for (int i = 0; i < thread_number; i++) {
         pthread_join(workers[i], nullptr);
     }
     cout << "Measuring ..." << endl;
+    oflf::gOFLF.debug = true;
     for (int i = 0; i < thread_number; i++) {
         pthread_create(&workers[i], nullptr, measureWorker, &parms[i]);
     }
