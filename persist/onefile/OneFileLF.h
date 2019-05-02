@@ -284,6 +284,7 @@ namespace oflf {
 
         // Adds a modification to the redo log
         inline void addOrReplace(void *addr, uint64_t val) {
+            //printf("\t\tR...%d...\n", numStores);
             if (tl_is_read_only) tl_is_read_only = false;
             const uint64_t hashAddr = hash(addr);
             if (numStores < MAX_ARRAY_LOOKUP) {
@@ -323,6 +324,7 @@ namespace oflf {
         // If the numStores is lower than MAX_ARRAY_LOOKUP, the lookup is done on the log, otherwise, the lookup is done on the hashmap.
         // If it's not in the write-set, return lval.
         inline uint64_t lookupAddr(const void *addr, uint64_t lval) {
+            //printf("\t\tL...%d...\n", numStores);
             if (numStores < MAX_ARRAY_LOOKUP) {
                 // Lookup in array
                 for (unsigned int idx = 0; idx < numStores; idx++) {
@@ -352,10 +354,11 @@ namespace oflf {
         // Applies all entries in the log as DCASes.
         // Seq must match for DCAS to succeed. This method is on the "hot-path".
         inline void apply(uint64_t seq, const int tid) {
+            //printf("\t\tA...%d...\n", numStores);
             for (uint64_t i = 0; i < numStores; i++) {
                 // Use an heuristic to give each thread 8 consecutive DCAS to apply
                 WriteSetEntry &e = log[(tid * 8 + i) % numStores];
-                tmtypebase <uint64_t> *tmte = (tmtypebase <uint64_t> *) e.addr;
+                tmtypebase<uint64_t> *tmte = (tmtypebase<uint64_t> *) e.addr;
                 uint64_t lval = tmte->val.load(std::memory_order_acquire);
                 uint64_t lseq = tmte->seq.load(std::memory_order_acquire);
                 if (lseq < seq) DCAS((uint64_t *) e.addr, lval, lseq, e.val, seq);
@@ -446,6 +449,19 @@ namespace oflf {
                 // Start over if there is already a new transaction
                 if (myopd.curTx == curTx.load(std::memory_order_acquire)) return;
             }
+        }
+
+        uint64_t logCount() {
+            int tid = tl_tcico.tid;
+            uint64_t count = 0;
+            for (int idx = 0; idx < writeSets[tid].numStores; idx++) {
+                WriteSetEntry *next = &writeSets[tid].log[idx];
+                while (next) {
+                    count++;
+                    next = next->next;
+                }
+            }
+            return count;
         }
 
         // Progress condition: wait-free population-oblivious
@@ -635,6 +651,7 @@ namespace oflf {
             OpData &opd = opData[idx];
             // Nothing to apply unless the request matches the curTx
             if (lcurTx != opd.request.load(std::memory_order_acquire)) return;
+            //printf("\tH...%d...\n", writeSets[tid].numStores);
             if (idx != tid) {
                 // Make a copy of the write-set and check if it is consistent
                 writeSets[tid] = writeSets[idx];
@@ -658,6 +675,7 @@ namespace oflf {
 
         // This is called when the transaction fails, to undo all the allocations done during the transaction
         void deleteAllocsFromLog(OpData &myopd, int tid, int newTx) {
+            //printf("\tD...%d...\n", writeSets[tid].numStores);
             for (unsigned i = 0; i < myopd.numAllocs; i++) {
                 myopd.alog[i].reclaim(myopd.alog[i].obj);
             }
@@ -675,6 +693,7 @@ namespace oflf {
         void retireRetiresFromLog(OpData &myopd, const int tid) {
             uint64_t lseq = trans2seq(curTx.load(std::memory_order_acquire));
             // First, add all the objects to the list of retired/zombies
+            //printf("\tR...%d...\n", writeSets[tid].numStores);
             for (unsigned i = 0; i < myopd.numRetires; i++) {
                 myopd.rlog[i]->delEra_ = lseq;
                 he.addToRetiredList(myopd.rlog[i], tid);

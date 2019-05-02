@@ -171,6 +171,13 @@ public:
         });
     }
 
+    // To verify the truncated log of each transaction, we count the logs of each transaction.
+    uint64_t logsize() {
+        return oflf::readTx<uint64_t>([&]() {
+            return oflf::gOFLF.logCount();
+        });
+    }
+
     // Used only for benchmarks
     void addAll(K **keys, const int size, const int tid = 0) {
         for (int i = 0; i < size; i++) add(*keys[i]);

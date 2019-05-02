@@ -38,6 +38,7 @@ struct target {
 void simpleInsert() {
     for (int i = 0; i < total_count; i++) {
         set->add(i);
+        //cout << set->logsize() << endl;
     }
     for (int i = 0; i < total_count; i += (total_count / QUERY_COUNT)) {
         cout << set->contains(i);
@@ -82,7 +83,7 @@ void *measureWorker(void *args) {
 #endif
     }
     long elipsed = tracer.getRunTime();
-    output[work->tid] << work->tid << " " << elipsed << endl;
+    output[work->tid] << work->tid << " " << elipsed << " " << work->set->logsize() << endl;
     __sync_fetch_and_add(&total_time, elipsed);
     __sync_fetch_and_add(&update, hit);
     __sync_fetch_and_add(&failure, fail);
@@ -101,7 +102,7 @@ void multiWorkers() {
         pthread_join(workers[i], nullptr);
     }
     cout << "Measuring ..." << endl;
-    oflf::gOFLF.debug = true;
+    oflf::gOFLF.debug = false;
     for (int i = 0; i < thread_number; i++) {
         pthread_create(&workers[i], nullptr, measureWorker, &parms[i]);
     }
