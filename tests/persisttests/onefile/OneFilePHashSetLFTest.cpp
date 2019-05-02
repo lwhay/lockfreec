@@ -75,9 +75,9 @@ void *measureWorker(void *args) {
             fail++;
         }
 #else
-        if (work->set->remove(i, work->tid)) {
+        if (work->set->remove(i)) {
             hit++;
-            if (!work->set->add(i, work->tid)) {
+            if (!work->set->add(i)) {
                 fail++;
             }
         }
