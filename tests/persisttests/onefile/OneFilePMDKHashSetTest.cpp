@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
     }
     output = new stringstream[thread_number];
     //set = new TMHashMapByRef<uint64_t, uint64_t, pmdk::PMDKTM, pmdk::persist>(1000);
-    pmdk::PMDKTM::updateTx<bool>([&]() {
+    pmdk::PMDKTM::updateTx([&]() {
         set = pmdk::PMDKTM::tmNew<TMHashMapByRef<uint64_t, uint64_t, pmdk::PMDKTM, pmdk::persist>>(1000);
     });
     Tracer tracer;
@@ -137,8 +137,6 @@ int main(int argc, char **argv) {
     for (int i = 0; i < total_count; i++) {
         set->remove(i);
     }
-    pmdk::PMDKTM::updateTx<bool>([&]() {
-        pmdk::PMDKTM::tmDelete(set);
-    });
+    pmdk::PMDKTM::updateTx([&]() { pmdk::PMDKTM::tmDelete(set); });
     delete[] output;
 }

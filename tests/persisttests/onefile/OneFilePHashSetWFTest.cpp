@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
         total_count = atoi(argv[2]);
     }
     output = new stringstream[thread_number];
-    pofwf::OneFileWF::updateTx<bool>([&]() {
+    pofwf::OneFileWF::updateTx([&]() {
         set = pofwf::OneFileWF::tmNew<TMHashMap<uint64_t, uint64_t, pofwf::OneFileWF, pofwf::tmtype>>(1000);
     });
     Tracer tracer;
@@ -132,6 +132,6 @@ int main(int argc, char **argv) {
     long ut = tracer.getRunTime();
     cout << "IT " << it << " ut " << ut << " dupinst " << exists << " tryupd " << update << " failinst " << failure
          << " avgtpt " << (double) update * 1000000 * thread_number / total_time << endl;
-    pofwf::OneFileWF::updateTx<bool>([&]() { pofwf::OneFileWF::tmDelete(set); });
+    pofwf::OneFileWF::updateTx([&]() { pofwf::OneFileWF::tmDelete(set); });
     delete[] output;
 }
