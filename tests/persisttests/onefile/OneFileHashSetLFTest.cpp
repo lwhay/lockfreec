@@ -132,9 +132,7 @@ int main(int argc, char **argv) {
     long ut = tracer.getRunTime();
     cout << "IT " << it << " ut " << ut << " dupinst " << exists << " tryupd " << update << " failinst " << failure
          << " avgtpt " << (double) update * 1000000 * thread_number / total_time << endl;
-    for (int i = 0; i < total_count; i++) {
-        set->remove(i);
-    }
+    for (int i = 0; i < total_count; i++) { set->remove(i); }
     delete set;
     delete[] output;
 }
