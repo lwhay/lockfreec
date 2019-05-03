@@ -102,7 +102,7 @@ void multiWorkers() {
         pthread_join(workers[i], nullptr);
     }
     cout << "Measuring ..." << endl;
-    oflf::gOFLF.debug = false;
+    oflf::gOFLF.debug = true;
     for (int i = 0; i < thread_number; i++) {
         pthread_create(&workers[i], nullptr, measureWorker, &parms[i]);
     }
