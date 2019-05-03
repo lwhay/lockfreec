@@ -6,7 +6,11 @@ enable_language(ASM)
 set(CMAKE_C_COMPILER "gcc")
 set(CMAKE_CXX_COMPILER "g++")
 set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 11)
+if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 5.1)
+    set(CMAKE_CXX_STANDARD 14)
+else ()
+    set(CMAKE_CXX_STANDARD 11)
+endif ()
 
 if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
     #set(BOOST_ROOT D:/cygwin64)
@@ -271,6 +275,12 @@ if (WITH_PLF_TESTS)
             tests/persisttests/onefile/OneFilePHashSetLFTest.cpp
             tests/persisttests/onefile/OneFilePHashSetWFTest.cpp
             )
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 5.1 AND CMAKE_SYSTEM_NAME MATCHES "Linux")
+        set(PMDK_LIBS "-L/usr/local/lib -lpmemobj")
+        set(PLF_TESTS
+                tests/persisttests/onefile/OneFilePMDKHashSetTest.cpp
+                ${PLF_TESTS})
+    endif ()
 endif ()
 
 option(WITH_FOSTER_TESTS "build with foster tests" ON)
@@ -414,5 +424,5 @@ foreach (sourcefile ${PERSIST_TESTS_EXES})
             EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
             OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
             )
-    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD})
+    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD} ${PMDK_LIBS})
 endforeach (sourcefile ${FOSTER_TESTS_EXES})
