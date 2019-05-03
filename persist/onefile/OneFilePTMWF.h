@@ -2,9 +2,8 @@
 // Created by Michael on 2019-05-03.
 // The lockfree basis comes from https://github.com/pramalhe/OneFile for comparison purposes.
 //
-
-#ifndef LOCKFREEC_ONEFILEPTMLF_H
-#define LOCKFREEC_ONEFILEPTMLF_H
+#ifndef LOCKFREEC_ONEFILEPTMWF_H
+#define LOCKFREEC_ONEFILEPTMWF_H
 
 #include <atomic>
 #include <cassert>
@@ -19,7 +18,7 @@
 #include <unistd.h>     // Needed by close()
 #include "tracer.h"
 
-// Please keep this file in sync (as much as possible) with stms/OneFileLF.hpp
+// Please keep this file in sync (as much as possible) with stms/OneFileWF.hpp
 
 // Macros needed for persistence
 #ifdef PWB_IS_CLFLUSH
@@ -28,9 +27,9 @@
    * Intel programming manual at https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-optimization-manual.pdf
    * Use these for Broadwell CPUs (cervino server)
    */
-#define PWB(addr)              __asm__ volatile("clflush (%0)" :: "r" (addr) : "memory")                  // Broadwell only works with this.
-#define PFENCE()               {}                                                                         // No ordering fences needed for CLFLUSH (section 7.4.6 of Intel manual)
-#define PSYNC()                {}                                                                         // For durability it's not obvious, but CLFLUSH seems to be enough, and PMDK uses the same approach
+#define PWB(addr)              __asm__ volatile("clflush (%0)" :: "r" (addr) : "memory")                      // Broadwell only works with this.
+#define PFENCE()               {}                                                                             // No ordering fences needed for CLFLUSH (section 7.4.6 of Intel manual)
+#define PSYNC()                {}                                                                             // For durability it's not obvious, but CLFLUSH seems to be enough, and PMDK uses the same approach
 #elif PWB_IS_CLFLUSHHARD
 #define PWB(addr)              asm volatile("clflush (%0)" :: "r" (addr) : "memory")                      // Broadwell only works with this.
 #define PFENCE()               asm volatile("sfence" : : : "memory")
@@ -55,12 +54,12 @@
 #endif
 
 /*
- * Differences between POneFileLF and the non-persistent OneFileLF:
+ * Differences between POneFileWF and the non-persistent OneFileWF:
  * - A secondary redo log (PWriteSet) is placed in persistent memory before attempting a 'commit'.
  * - The set of the request in helpApply() is always done with a CAS to enforce ordering on the PWBs of the DCAS;
  * - The persistent logs are allocated in PM, same as all user allocations from tmNew(), 'curTx', and 'request'
  */
-namespace poflf {
+namespace pofwf {
 
 //
 // User configurable variables.
@@ -82,9 +81,9 @@ namespace poflf {
     static const char *PFILE_NAME = "/dev/shm/ponefilelf_shared";
 #endif
 // Start address of mapped persistent memory
-    static uint8_t *PREGION_ADDR = (uint8_t *) 0x7fea00000000;
+    static uint8_t *PREGION_ADDR = (uint8_t *) 0x7ff000000000;
 // Size of persistent memory. Part of it will be used by the redo logs
-    static const uint64_t PREGION_SIZE = 1024 * 1024 * 1024ULL;   // 1 GB by default
+    static const uint64_t PREGION_SIZE = 1024 * 1024 * 1024ULL;    // 1 GB by default
 // End address of mapped persistent memory
     static uint8_t *PREGION_END = (PREGION_ADDR + PREGION_SIZE);
 // Maximum number of root pointers available for the user
@@ -206,17 +205,208 @@ namespace poflf {
         }
     };
 
-// Forward declaration needed by EsLoco
-    template<typename T>
-    struct tmtype;
+// Each object tracked by Hazard Eras needs to have tmbase as one of its base classes.
+    struct tmbase {
+        uint64_t newEra_{0};        // Filled by tmNew() or tmMalloc()
+        uint64_t delEra_{0};        // Filled by tmDelete() or tmFree()
+    };
 
-// We need to split the contents from the methods due to compilation dependencies
+// A wrapper to std::function so that we can track it with Hazard Eras
+    struct TransFunc : public tmbase {
+        std::function<uint64_t()> func;
+
+        template<typename F>
+        TransFunc(F &&f) : func{f} {}
+    };
+
+// This is a specialized implementation of Hazard Eras meant to be used in the OneFile STM.
+// Hazard Eras is a lock-free memory reclamation technique described here:
+// https://github.com/pramalhe/ConcurrencyFreaks/blob/master/papers/hazarderas-2017.pdf
+// https://dl.acm.org/citation.cfm?id=3087588
+//
+// We're using OF::curTx.seq as the global era.
+//
+// This implementation is different from the lock-free OneFile STM because we need
+// to track the lifetime of the std::function objects where the lambdas are put.
+    class HazardErasOF {
+    private:
+        static const uint64_t NOERA = 0;
+        static const int CLPAD = 128 / sizeof(std::atomic<uint64_t>);
+        static const int THRESHOLD_R = 0; // This is named 'R' in the HP paper
+        const unsigned int maxThreads;
+        alignas(128) std::atomic<uint64_t> *he;
+        // It's not nice that we have a lot of empty vectors, but we need padding to avoid false sharing
+        alignas(128) std::vector<TransFunc *> retiredListTx[REGISTRY_MAX_THREADS * CLPAD];
+
+    public:
+        HazardErasOF(unsigned int maxThreads = REGISTRY_MAX_THREADS) : maxThreads{maxThreads} {
+            he = new std::atomic<uint64_t>[REGISTRY_MAX_THREADS * CLPAD];
+            for (unsigned it = 0; it < REGISTRY_MAX_THREADS; it++) {
+                he[it * CLPAD].store(NOERA, std::memory_order_relaxed);
+                retiredListTx[it * CLPAD].reserve(REGISTRY_MAX_THREADS);
+            }
+        }
+
+        ~HazardErasOF() {
+            // Clear the objects in the retired lists
+            for (unsigned it = 0; it < maxThreads; it++) {
+                for (unsigned iret = 0; iret < retiredListTx[it * CLPAD].size(); iret++) {
+                    TransFunc *tx = retiredListTx[it * CLPAD][iret];
+                    delete tx;
+                }
+            }
+            delete[] he;
+        }
+
+        // Progress condition: wait-free population oblivious
+        inline void clear(const int tid) {
+            he[tid * CLPAD].store(NOERA, std::memory_order_release);
+        }
+
+        // Progress condition: wait-free population oblivious
+        inline void set(uint64_t trans, const int tid) {
+            he[tid * CLPAD].store(trans2seq(trans));
+        }
+
+        // Progress condition: wait-free population oblivious
+        inline void addToRetiredListTx(TransFunc *tx, const int tid) {
+            retiredListTx[tid * CLPAD].push_back(tx);
+        }
+
+        /**
+         * Progress condition: bounded wait-free
+         *
+         * Attemps to delete the no-longer-in-use objects in the retired list.
+         * We need to pass the currEra coming from the seq of the currTx so that
+         * the objects from the current transaction don't get deleted.
+         *
+         * TODO: consider using erase() with std::remove_if()
+         */
+        void clean(uint64_t curEra, const int tid) {
+            for (unsigned iret = 0; iret < retiredListTx[tid * CLPAD].size();) {
+                TransFunc *tx = retiredListTx[tid * CLPAD][iret];
+                if (canDelete(curEra, tx)) {
+                    retiredListTx[tid * CLPAD].erase(retiredListTx[tid * CLPAD].begin() + iret);
+                    delete tx;
+                    continue;
+                }
+                iret++;
+            }
+        }
+
+        // Progress condition: wait-free bounded (by the number of threads)
+        inline bool canDelete(uint64_t curEra, tmbase *del) {
+            // We can't delete objects from the current transaction
+            if (del->delEra_ == curEra) return false;
+            for (unsigned it = 0; it < ThreadRegistry::getMaxThreads(); it++) {
+                const auto era = he[it * CLPAD].load(std::memory_order_acquire);
+                if (era == NOERA || era < del->newEra_ || era > del->delEra_) continue;
+                return false;
+            }
+            return true;
+        }
+    };
+
+// T is typically a pointer to a node, but it can be integers or other stuff, as long as it fits in 64 bits
     template<typename T>
-    struct tmtypebase {
+    struct tmtype {
         // Stores the actual value as an atomic
         std::atomic<uint64_t> val;
         // Lets hope this comes immediately after 'val' in memory mapping, otherwise the DCAS() will fail
         std::atomic<uint64_t> seq;
+
+        tmtype() {}
+
+        tmtype(T initVal) { pstore(initVal); }
+
+        // Casting operator
+        operator T() { return pload(); }
+
+        // Prefix increment operator: ++x
+        void operator++() { pstore(pload() + 1); }
+
+        // Prefix decrement operator: --x
+        void operator--() { pstore(pload() - 1); }
+
+        void operator++(int) { pstore(pload() + 1); }
+
+        void operator--(int) { pstore(pload() - 1); }
+
+        // Equals operator: first downcast to T and then compare
+        bool operator==(const T &otherval) const { return pload() == otherval; }
+
+        // Difference operator: first downcast to T and then compare
+        bool operator!=(const T &otherval) const { return pload() != otherval; }
+
+        // Relational operators
+        bool operator<(const T &rhs) { return pload() < rhs; }
+
+        bool operator>(const T &rhs) { return pload() > rhs; }
+
+        bool operator<=(const T &rhs) { return pload() <= rhs; }
+
+        bool operator>=(const T &rhs) { return pload() >= rhs; }
+
+        // Operator arrow ->
+        T operator->() { return pload(); }
+
+        // Copy constructor
+        tmtype<T>(const tmtype<T> &other) { pstore(other.pload()); }
+
+        // Assignment operator from an tmtype
+        tmtype<T> &operator=(const tmtype<T> &other) {
+            pstore(other.pload());
+            return *this;
+        }
+
+        // Assignment operator from a value
+        tmtype<T> &operator=(T value) {
+            pstore(value);
+            return *this;
+        }
+
+        // Operator &
+        T *operator&() {
+            return (T * )
+            this;
+        }
+
+        // Meant to be called when know we're the only ones touching
+        // these contents, for example, in the constructor of an object, before
+        // making the object visible to other threads.
+        inline void isolated_store(T newVal) {
+            val.store((uint64_t) newVal, std::memory_order_relaxed);
+        }
+
+        // Used only internally to initialize the operations[] array
+        inline void operationsInit() {
+            val.store((uint64_t) nullptr, std::memory_order_relaxed);
+            seq.store(0, std::memory_order_relaxed);
+        }
+
+        // Used only internally to initialize the results[] array
+        inline void resultsInit() {
+            val.store(0, std::memory_order_relaxed);
+            seq.store(1, std::memory_order_relaxed);
+        }
+
+        // Used only internally by updateTx() to determine if the request is opened or not
+        inline uint64_t getSeq() const {
+            return seq.load(std::memory_order_acquire);
+        }
+
+        // Used only internally by updateTx()
+        inline void rawStore(T &newVal, uint64_t lseq) {
+            val.store((uint64_t) newVal, std::memory_order_relaxed);
+            seq.store(lseq, std::memory_order_release);
+        }
+
+        // Methods that are defined later because they have compilation dependencies on gOFWF
+        inline T pload() const;
+
+        inline bool rawLoad(T &keepVal, uint64_t &keepSeq);
+
+        inline void pstore(T newVal);
     };
 
 /*
@@ -352,17 +542,13 @@ namespace poflf {
         }
     };
 
-// Needed by our benchmarks
-    struct tmbase {
-    };
-
-// An entry in the persistent write-set
+// An entry in the persistent write-set (compacted for performance reasons)
     struct PWriteSetEntry {
         void *addr;  // Address of value+sequence to change
         uint64_t val;   // Desired value to change to
     };
 
-// The persistent write-set (undo log)
+// The persistent write-set
     struct PWriteSet {
         uint64_t numStores{0};          // Number of stores in the writeSet for the current transaction
         std::atomic<uint64_t> request{0};            // Can be moved to CLOSED by other threads, using a CAS
@@ -384,7 +570,7 @@ namespace poflf {
         static const uint64_t MAGIC_ID = 0x1337babe;
         std::atomic<uint64_t> curTx{seqidx2trans(1, 0)};
         std::atomic<uint64_t> pad1[15];
-        tmtypebase<void *> rootPtrs[MAX_ROOT_POINTERS];
+        tmtype<void *> rootPtrs[MAX_ROOT_POINTERS];
         PWriteSet plog[REGISTRY_MAX_THREADS];
         uint64_t id{0};
         uint64_t pad2{0};
@@ -438,6 +624,10 @@ namespace poflf {
         inline void addOrReplace(void *addr, uint64_t val) {
             if (tl_is_read_only) tl_is_read_only = false;
             const uint64_t hashAddr = hash(addr);
+            if ((((size_t) addr & (~0xFULL)) != (size_t) addr)) {
+                printf("Alignment ERROR in addOrReplace() at address %p\n", addr);
+                assert(false);
+            }
             if (numStores < MAX_ARRAY_LOOKUP) {
                 // Lookup in array
                 for (unsigned int idx = 0; idx < numStores; idx++) {
@@ -494,6 +684,27 @@ namespace poflf {
             return lval;
         }
 
+        // Returns true if there is a predecent log entry for the same cache line
+        inline bool lookupCacheLine(void *addr, int myidx) {
+            size_t cl = (size_t) addr & (~0x3F);
+            if (numStores < MAX_ARRAY_LOOKUP) {
+                // Lookup in array
+                for (unsigned int idx = 0; idx < myidx; idx++) {
+                    if ((size_t) log[idx].addr & (~0x3F) == cl) return true;
+                }
+            } else {
+                // Lookup in hashmap. If it has the same cache line, it must be in this bucket
+                WriteSetEntry *be = buckets[hash(addr)];
+                if (be < &log[numStores]) {
+                    while (be != nullptr) {
+                        if ((size_t) be->addr & (~0x3F) == cl) return true;
+                        be = be->next;
+                    }
+                }
+            }
+            return false;
+        }
+
         // Assignment operator, used when making a copy of a WriteSet to help another thread
         WriteSet &operator=(const WriteSet &other) {
             numStores = other.numStores;
@@ -507,7 +718,7 @@ namespace poflf {
             for (uint64_t i = 0; i < numStores; i++) {
                 // Use an heuristic to give each thread 8 consecutive DCAS to apply
                 WriteSetEntry &e = log[(tid * 8 + i) % numStores];
-                tmtypebase <uint64_t> *tmte = (tmtypebase <uint64_t> *) e.addr;
+                tmtype <uint64_t> *tmte = (tmtype <uint64_t> *) e.addr;
                 uint64_t lval = tmte->val.load(std::memory_order_acquire);
                 uint64_t lseq = tmte->seq.load(std::memory_order_acquire);
                 if (lseq < seq) DCAS((uint64_t *) e.addr, lval, lseq, e.val, seq);
@@ -517,7 +728,7 @@ namespace poflf {
 
 // Forward declaration
     struct OpData;
-// This is used by addOrReplace() to know which OpDesc instance to use for the current transaction
+// This is used by addOrReplace() to know which OpData instance to use for the current transaction
     extern thread_local OpData *tl_opdata;
 
 // Its purpose is to hold thread-local data
@@ -534,18 +745,16 @@ namespace poflf {
     };
     static constexpr AbortedTx AbortedTxException{};
 
-    class OneFileLF;
+    class OneFileWF;
 
-    extern OneFileLF gOFLF;
+    extern OneFileWF gOFWF;
 
 /**
- * <h1> One-File PTM (Lock-Free) </h1>
+ * <h1> OneFile STM (Wait-Free) </h1>
  *
- * One-File is a Persistent Software Transacional Memory with lock-free progress, meant to
- * implement lock-free data structures. It has integrated lock-free memory
- * reclamation using an optimistic memory scheme
- *
- * OF is a word-based PTM and it uses double-compare-and-swap (DCAS).
+ * OneFile is a Software Transacional Memory with wait-free progress, meant to
+ * implement wait-free data structures.
+ * OneFile is a word-based STM and it uses double-compare-and-swap (DCAS).
  *
  * Right now it has several limitations, some will be fixed in the future, some may be hard limitations of this approach:
  * - We can't have stack allocated tmtype<> variables. For example, we can't created inside a transaction "tmtpye<uint64_t> tmp = a;",
@@ -553,12 +762,18 @@ namespace poflf {
  * - We need DCAS but it can be emulated with LL/SC or even with single-word CAS
  *   if we do redirection to a (lock-free) pool with SeqPtrs;
  */
-    class OneFileLF {
+    class OneFileWF {
     private:
         static const bool debug = false;
         OpData *opData;
         int fd{-1};
-
+        HazardErasOF he{REGISTRY_MAX_THREADS};
+        // Maximum number of times a reader will fail a transaction before turning into an updateTx()
+        static const int MAX_READ_TRIES = 4;
+        // Member variables for wait-free consensus
+        tmtype<TransFunc *> *operations;  // We've tried adding padding here but it didn't make a difference
+        tmtype<uint64_t> *results;
+        uint64_t padding[16];
     public:
         EsLoco<tmtype> esloco{};
         PMetadata *pmd{nullptr};
@@ -566,24 +781,30 @@ namespace poflf {
                 nullptr};              // Pointer to persistent memory location of curTx (it's in PMetadata)
         WriteSet *writeSets;                    // Two write-sets for each thread
 
-        OneFileLF() {
+        OneFileWF() {
             opData = new OpData[REGISTRY_MAX_THREADS];
             writeSets = new WriteSet[REGISTRY_MAX_THREADS];
+            operations = new tmtype<TransFunc *>[REGISTRY_MAX_THREADS];
+            for (unsigned i = 0; i < REGISTRY_MAX_THREADS; i++) operations[i].operationsInit();
+            results = new tmtype<uint64_t>[REGISTRY_MAX_THREADS];
+            for (unsigned i = 0; i < REGISTRY_MAX_THREADS; i++) results[i].resultsInit();
             mapPersistentRegion(PFILE_NAME, PREGION_ADDR, PREGION_SIZE);
         }
 
-        ~OneFileLF() {
+        ~OneFileWF() {
             delete[] opData;
             delete[] writeSets;
+            delete[] operations;
+            delete[] results;
         }
 
-        static std::string className() { return "OneFilePTM-LF"; }
+        static std::string className() { return "OneFilePTM-WF"; }
 
         void mapPersistentRegion(const char *filename, uint8_t *regionAddr, const uint64_t regionSize) {
             // Check that the header with the logs leaves at least half the memory available to the user
             if (sizeof(PMetadata) > regionSize / 2) {
                 printf("ERROR: the size of the logs in persistent memory is so large that it takes more than half the whole persistent memory\n");
-                printf("Please reduce some of the settings in OneFilePTMLF.hpp and try again\n");
+                printf("Please reduce some of the settings in OneFilePTM.hpp and try again\n");
                 assert(false);
             }
             bool reuseRegion = false;
@@ -635,18 +856,15 @@ namespace poflf {
             }
         }
 
-        // Progress Condition: lock-free
-        // The while-loop retarts only if there was at least one other thread completing a transaction
-        void beginTx(OpData &myopd, const int tid) {
-            tl_is_read_only = true;
-            while (true) {
-                myopd.curTx = curTx->load(std::memory_order_acquire);
-                helpApply(myopd.curTx, tid);
-                // Reset the write-set after (possibly) helping another transaction complete
-                writeSets[tid].numStores = 0;
-                // Start over if there is already a new transaction
-                if (myopd.curTx == curTx->load(std::memory_order_acquire)) return;
-            }
+        // My transaction was successful, it's my duty to cleanup any retired objects.
+        // This is called by the owner thread when the transaction succeeds, to pass
+        // the retired objects to Hazard Eras. We can't delete the objects
+        // immediately because there might be other threads trying to apply our log
+        // which may (or may not) contain addresses inside the objects in this list.
+        void retireRetiresFromLog(OpData &myopd, const int tid) {
+            uint64_t lseq = trans2seq(curTx->load(std::memory_order_acquire));
+            // Start a cleaning phase, scanning to see which ones can be removed
+            he.clean(lseq, tid);
         }
 
         // Progress condition: wait-free population-oblivious
@@ -672,6 +890,7 @@ namespace poflf {
             PWB(curTx);
             // Execute each store in the write-set using DCAS() and close the request
             helpApply(newTx, tid);
+            retireRetiresFromLog(myopd, tid);
             // We should need a PSYNC() here to provide durable linearizabilty, but the CAS of the state in helpApply() acts as a PSYNC() (on x86).
             if (debug)
                 printf("Committed transaction (%ld,%ld) with %ld stores\n", seq + 1, (uint64_t) tid,
@@ -679,70 +898,123 @@ namespace poflf {
             return true;
         }
 
-        // Same as beginTx/endTx transaction, but with lambdas, and it handles AbortedTx exceptions
-        template<typename R, typename F>
-        R transaction(F &&func) {
+        // Progress condition: wait-free (bounded by the number of threads)
+        // Applies a mutative transaction or gets another thread with an ongoing
+        // transaction to apply it.
+        // If three 'seq' have passed since the transaction when we published our
+        // function, then the worst-case scenario is: the first transaction does not
+        // see our function; the second transaction transforms our function
+        // but doesn't apply the corresponding write-set; the third transaction
+        // guarantees that the log of the second transaction is applied.
+        inline void innerUpdateTx(OpData &myopd, TransFunc *funcptr, const int tid) {
+            ++myopd.nestedTrans;
+            if (debug) printf("updateTx(tid=%d)\n", tid);
+            // We need an era from before the 'funcptr' is announced, so as to protect it
+            uint64_t firstEra = trans2seq(curTx->load(std::memory_order_acquire));
+            operations[tid].rawStore(funcptr, results[tid].getSeq());
+            tl_opdata = &myopd;
+            // Check 3x for the completion of our function because we don't have a fence
+            // on operations[tid].rawStore(), otherwise it would be just 2x.
+            for (int iter = 0; iter < 4; iter++) {
+                // An update transaction is read-only until it does the first store()
+                tl_is_read_only = true;
+                // Clear the logs of the previous transaction
+                writeSets[tid].numStores = 0;
+                myopd.curTx = curTx->load(std::memory_order_acquire);
+                // Optimization: if my request is answered, then my tx is committed
+                if (results[tid].getSeq() > operations[tid].getSeq()) break;
+                helpApply(myopd.curTx, tid);
+                // Reset the write-set after (possibly) helping another transaction complete
+                writeSets[tid].numStores = 0;
+                // Use HE to protect the TransFunc we're going to access
+                he.set(myopd.curTx, tid);
+                if (myopd.curTx != curTx->load()) continue;
+                try {
+                    if (!transformAll(myopd.curTx, tid)) continue;
+                } catch (AbortedTx &) {
+                    continue;
+                }
+                if (commitTx(myopd, tid)) break;
+            }
+            tl_opdata = nullptr;
+            --myopd.nestedTrans;
+            he.clear(tid);
+            retireMyFunc(tid, funcptr, firstEra);
+        }
+
+        // Update transaction with non-void return value
+        template<typename R, class F>
+        static R updateTx(F &&func) {
+            const int tid = ThreadRegistry::getTID();
+            OpData &myopd = gOFWF.opData[tid];
+            if (myopd.nestedTrans > 0) return func();
+            // Copy the lambda to a std::function<> and announce a request with the pointer to it
+            gOFWF.innerUpdateTx(myopd, new TransFunc([func]() { return (uint64_t) func(); }), tid);
+            return (R) gOFWF.results[tid].pload();
+        }
+
+        // Update transaction with void return value
+        template<class F>
+        static void updateTx(F &&func) {
+            const int tid = ThreadRegistry::getTID();
+            OpData &myopd = gOFWF.opData[tid];
+            if (myopd.nestedTrans > 0) {
+                func();
+                return;
+            }
+            // Copy the lambda to a std::function<> and announce a request with the pointer to it
+            gOFWF.innerUpdateTx(myopd, new TransFunc([func]() {
+                func();
+                return 0;
+            }), tid);
+        }
+
+        // Progress condition: wait-free (bounded by the number of threads + MAX_READ_TRIES)
+        template<typename R, class F>
+        R readTransaction(F &&func) {
             const int tid = ThreadRegistry::getTID();
             OpData &myopd = opData[tid];
             if (myopd.nestedTrans > 0) return func();
             ++myopd.nestedTrans;
             tl_opdata = &myopd;
+            tl_is_read_only = true;
+            if (debug) printf("readTx(tid=%d)\n", tid);
             R retval{};
-            while (true) {
-                beginTx(myopd, tid);
+            writeSets[tid].numStores = 0;
+            for (int iter = 0; iter < MAX_READ_TRIES; iter++) {
+                myopd.curTx = curTx->load(std::memory_order_acquire);
+                helpApply(myopd.curTx, tid);
+                // Reset the write-set after (possibly) helping another transaction complete
+                writeSets[tid].numStores = 0;
+                // Use HE to protect the objects we're going to access during the simulation
+                he.set(myopd.curTx, tid);
+                if (myopd.curTx != curTx->load()) continue;
                 try {
                     retval = func();
                 } catch (AbortedTx &) {
                     continue;
                 }
-                if (commitTx(myopd, tid)) break;
+                --myopd.nestedTrans;
+                tl_opdata = nullptr;
+                he.clear(tid);
+                return retval;
             }
-            tl_opdata = nullptr;
+            if (debug) printf("readTx() executed MAX_READ_TRIES, posing as updateTx()\n");
             --myopd.nestedTrans;
-            return retval;
+            // Tried too many times unsucessfully, pose as an updateTx()
+            return updateTx<R>(func);
         }
 
-        // Same as above, but returns void
-        template<typename F>
-        void transaction(F &&func) {
-            const int tid = ThreadRegistry::getTID();
-            OpData &myopd = opData[tid];
-            if (myopd.nestedTrans > 0) {
-                func();
-                return;
-            }
-            ++myopd.nestedTrans;
-            tl_opdata = &myopd;
-            while (true) {
-                beginTx(myopd, tid);
-                try {
-                    func();
-                } catch (AbortedTx &) {
-                    continue;
-                }
-                if (commitTx(myopd, tid)) break;
-            }
-            tl_opdata = nullptr;
-            --myopd.nestedTrans;
-        }
-
-        // It's silly that these have to be static, but we need them for the (SPS) benchmarks due to templatization
         template<typename R, typename F>
-        static R updateTx(F &&func) { return gOFLF.transaction<R>(func); }
-
-        template<typename R, typename F>
-        static R readTx(F &&func) { return gOFLF.transaction<R>(func); }
+        static R readTx(F &&func) { return gOFWF.readTransaction<R>(func); }
 
         template<typename F>
-        static void updateTx(F &&func) { gOFLF.transaction(func); }
-
-        template<typename F>
-        static void readTx(F &&func) { gOFLF.transaction(func); }
+        static void readTx(F &&func) { gOFWF.readTransaction(func); }
 
         template<typename T, typename... Args>
         static T *tmNew(Args &&... args) {
             //template <typename T> static T* tmNew() {
-            T *ptr = (T *) gOFLF.esloco.malloc(sizeof(T));
+            T *ptr = (T *) gOFWF.esloco.malloc(sizeof(T));
             //new (ptr) T;  // new placement
             new(ptr) T(std::forward<Args>(args)...);
             return ptr;
@@ -760,37 +1032,38 @@ namespace poflf {
                 printf("ERROR: Can not allocate outside a transaction\n");
                 return nullptr;
             }
-            void *obj = gOFLF.esloco.malloc(size);
+            void *obj = gOFWF.esloco.malloc(size);
             return obj;
         }
 
+        // We assume there is a tmbase allocated in the beginning of the allocation
         static void tmFree(void *obj) {
             if (obj == nullptr) return;
             if (tl_opdata == nullptr) {
                 printf("ERROR: Can not de-allocate outside a transaction\n");
                 return;
             }
-            gOFLF.esloco.free(obj);
+            gOFWF.esloco.free(obj);
         }
 
         static void *pmalloc(size_t size) {
-            return gOFLF.esloco.malloc(size);
+            return gOFWF.esloco.malloc(size);
         }
 
         static void pfree(void *obj) {
             if (obj == nullptr) return;
-            gOFLF.esloco.free(obj);
+            gOFWF.esloco.free(obj);
         }
 
         template<typename T>
         static inline T *get_object(int idx) {
-            tmtype < T * > *ptr = (tmtype < T * > *) & (gOFLF.pmd->rootPtrs[idx]);
+            tmtype < T * > *ptr = (tmtype < T * > *) & (gOFWF.pmd->rootPtrs[idx]);
             return ptr->pload();
         }
 
         template<typename T>
         static inline void put_object(int idx, T *obj) {
-            tmtype < T * > *ptr = (tmtype < T * > *) & (gOFLF.pmd->rootPtrs[idx]);
+            tmtype < T * > *ptr = (tmtype < T * > *) & (gOFWF.pmd->rootPtrs[idx]);
             ptr->pstore(obj);
         }
 
@@ -818,6 +1091,32 @@ namespace poflf {
             }
         }
 
+        inline void retireMyFunc(const int tid, TransFunc *myfunc, uint64_t firstEra) {
+            myfunc->newEra_ = firstEra;
+            myfunc->delEra_ = trans2seq(curTx->load(std::memory_order_acquire)) + 1; // Do we really need the +1 ?
+            he.addToRetiredListTx(myfunc, tid);
+        }
+
+        // Aggregate all the functions of the different thread's writeTransaction()
+        // and transform them into to a single log (the current thread's log).
+        // Returns true if all active TransFunc were transformed
+        inline bool transformAll(const uint64_t lcurrTx, const int tid) {
+            for (unsigned i = 0; i < ThreadRegistry::getMaxThreads(); i++) {
+                // Check if the operation of thread i has been applied (has a matching result)
+                TransFunc *txfunc;
+                uint64_t res, operationsSeq, resultSeq;
+                if (!operations[i].rawLoad(txfunc, operationsSeq)) continue;
+                if (!results[i].rawLoad(res, resultSeq)) continue;
+                if (resultSeq > operationsSeq) continue;
+                // Operation has not yet been applied, check that transaction identifier has not changed
+                if (lcurrTx != curTx->load(std::memory_order_acquire)) return false;
+                // Apply the operation of thread i and save result in results[i],
+                // with this store being part of the transaction itself.
+                results[i] = txfunc->func();
+            }
+            return true;
+        }
+
         // Upon restart, re-applies the last transaction, so as to guarantee that
         // we have a consistent state in persistent memory.
         // This is not needed on x86, where the DCAS has atomicity writting to persistent memory.
@@ -828,140 +1127,85 @@ namespace poflf {
         }
     };
 
-// T is typically a pointer to a node, but it can be integers or other stuff, as long as it fits in 64 bits
-    template<typename T>
-    struct tmtype : tmtypebase<T> {
-        tmtype() {}
-
-        tmtype(T initVal) { pstore(initVal); }
-
-        // Casting operator
-        operator T() { return pload(); }
-
-        // Prefix increment operator: ++x
-        void operator++() { pstore(pload() + 1); }
-
-        // Prefix decrement operator: --x
-        void operator--() { pstore(pload() - 1); }
-
-        void operator++(int) { pstore(pload() + 1); }
-
-        void operator--(int) { pstore(pload() - 1); }
-
-        // Equals operator: first downcast to T and then compare
-        bool operator==(const T &otherval) const { return pload() == otherval; }
-
-        // Difference operator: first downcast to T and then compare
-        bool operator!=(const T &otherval) const { return pload() != otherval; }
-
-        // Relational operators
-        bool operator<(const T &rhs) { return pload() < rhs; }
-
-        bool operator>(const T &rhs) { return pload() > rhs; }
-
-        bool operator<=(const T &rhs) { return pload() <= rhs; }
-
-        bool operator>=(const T &rhs) { return pload() >= rhs; }
-
-        // Operator arrow ->
-        T operator->() { return pload(); }
-
-        // Copy constructor
-        tmtype<T>(const tmtype<T> &other) { pstore(other.pload()); }
-
-        // Assignment operator from an tmtype
-        tmtype<T> &operator=(const tmtype<T> &other) {
-            pstore(other.pload());
-            return *this;
-        }
-
-        // Assignment operator from a value
-        tmtype<T> &operator=(T value) {
-            pstore(value);
-            return *this;
-        }
-
-        // Operator &
-        T *operator&() {
-            return (T * )
-            this;
-        }
-
-        // Meant to be called when know we're the only ones touching
-        // these contents, for example, in the constructor of an object, before
-        // making the object visible to other threads.
-        inline void isolated_store(T newVal) {
-            tmtypebase<T>::val.store((uint64_t) newVal, std::memory_order_relaxed);
-        }
-
-        // We don't need to check curTx here because we're not de-referencing
-        // the val. It's only after a load() that the val may be de-referenced
-        // (in user code), therefore we do the check on load() only.
-        inline void pstore(T newVal) {
-            OpData *const myopd = tl_opdata;
-            if (myopd == nullptr) { // Looks like we're outside a transaction
-                tmtypebase<T>::val.store((uint64_t) newVal, std::memory_order_relaxed);
-            } else {
-                gOFLF.writeSets[tl_tcico.tid].addOrReplace(this, (uint64_t) newVal);
-            }
-        }
-
-        // We have to check if there is a new ongoing transaction and if so, abort
-        // this execution immediately for two reasons:
-        // 1. Memory Reclamation: the val we're returning may be a pointer to an
-        // object that has since been retired and deleted, therefore we can't allow
-        // user code to de-reference it;
-        // 2. Invariant Conservation: The val we're reading may be from a newer
-        // transaction, which implies that it may break an invariant in the user code.
-        // See examples of invariant breaking in this post:
-        // http://concurrencyfreaks.com/2013/11/stampedlocktryoptimisticread-and.html
-        inline T pload() const {
-            T lval = (T) tmtypebase<T>::val.load(std::memory_order_acquire);
-            OpData *const myopd = tl_opdata;
-            if (myopd == nullptr) return lval;
-            if ((uint8_t *) this < PREGION_ADDR || (uint8_t *) this > PREGION_END) return lval;
-            uint64_t lseq = tmtypebase<T>::seq.load(std::memory_order_acquire);
-            if (lseq > trans2seq(myopd->curTx)) throw AbortedTxException;
-            if (tl_is_read_only) return lval;
-            return (T) gOFLF.writeSets[tl_tcico.tid].lookupAddr(this, (uint64_t) lval);
-        }
-    };
-
 //
 // Wrapper methods to the global TM instance. The user should use these:
 //
     template<typename R, typename F>
-    static R updateTx(F &&func) { return gOFLF.transaction<R>(func); }
+    static R updateTx(F &&func) { return gOFWF.updateTx<R>(func); }
 
     template<typename R, typename F>
-    static R readTx(F &&func) { return gOFLF.transaction<R>(func); }
+    static R readTx(F &&func) { return gOFWF.readTx<R>(func); }
 
     template<typename F>
-    static void updateTx(F &&func) { gOFLF.transaction(func); }
+    static void updateTx(F &&func) { gOFWF.updateTx(func); }
 
     template<typename F>
-    static void readTx(F &&func) { gOFLF.transaction(func); }
+    static void readTx(F &&func) { gOFWF.readTx(func); }
 
     template<typename T, typename... Args>
-    T *tmNew(Args &&... args) { return OneFileLF::tmNew<T>(std::forward<Args>(args)...); }
+    T *tmNew(Args &&... args) { return OneFileWF::tmNew<T>(args...); }
 
     template<typename T>
-    void tmDelete(T *obj) { OneFileLF::tmDelete<T>(obj); }
+    void tmDelete(T *obj) { OneFileWF::tmDelete<T>(obj); }
 
     template<typename T>
-    static T *get_object(int idx) { return OneFileLF::get_object<T>(idx); }
+    static T *get_object(int idx) { return OneFileWF::get_object<T>(idx); }
 
     template<typename T>
-    static void put_object(int idx, T *obj) { OneFileLF::put_object<T>(idx, obj); }
+    static void put_object(int idx, T *obj) { OneFileWF::put_object<T>(idx, obj); }
 
-    inline static void *tmMalloc(size_t size) { return OneFileLF::tmMalloc(size); }
+    inline void *tmMalloc(size_t size) { return OneFileWF::tmMalloc(size); }
 
-    inline static void tmFree(void *obj) { OneFileLF::tmFree(obj); }
+    inline void tmFree(void *obj) { OneFileWF::tmFree(obj); }
+
+// We have to check if there is a new ongoing transaction and if so, abort
+// this execution immediately for two reasons:
+// 1. Memory Reclamation: the val we're returning may be a pointer to an
+// object that has since been retired and deleted, therefore we can't allow
+// user code to de-reference it;
+// 2. Invariant Conservation: The val we're reading may be from a newer
+// transaction, which implies that it may break an invariant in the user code.
+// See examples of invariant breaking in this post:
+// http://concurrencyfreaks.com/2013/11/stampedlocktryoptimisticread-and.html
+    template<typename T>
+    inline T tmtype<T>::pload() const {
+        T lval = (T) val.load(std::memory_order_acquire);
+        OpData *const myopd = tl_opdata;
+        if (myopd == nullptr) return lval;
+        if ((uint8_t *) this < PREGION_ADDR || (uint8_t *) this > PREGION_END) return lval;
+        uint64_t lseq = seq.load(std::memory_order_acquire);
+        if (lseq > trans2seq(myopd->curTx)) throw AbortedTxException;
+        if (tl_is_read_only) return lval;
+        return (T) gOFWF.writeSets[tl_tcico.tid].lookupAddr(this, (uint64_t) lval);
+    }
+
+// This method is meant to be used by the internal consensus mechanism, not by the user.
+// Returns true if the 'val' and 'seq' placed in 'keepVal' and 'keepSeq'
+// are consistent, i.e. linearizabile. We need to use acquire-loads to keep
+// order and re-check the 'seq' to make sure it corresponds to the 'val' we're returning.
+    template<typename T>
+    inline bool tmtype<T>::rawLoad(T &keepVal, uint64_t &keepSeq) {
+        keepSeq = seq.load(std::memory_order_acquire);
+        keepVal = (T) val.load(std::memory_order_acquire);
+        return (keepSeq == seq.load(std::memory_order_acquire));
+    }
+
+// We don't need to check currTx here because we're not de-referencing
+// the val. It's only after a load() that the val may be de-referenced
+// (in user code), therefore we do the check on load() only.
+    template<typename T>
+    inline void tmtype<T>::pstore(T newVal) {
+        if (tl_opdata == nullptr) { // Looks like we're outside a transaction
+            val.store((uint64_t) newVal, std::memory_order_relaxed);
+        } else {
+            gOFWF.writeSets[tl_tcico.tid].addOrReplace(this, (uint64_t) newVal);
+        }
+    }
 
 //
 // Place these in a .cpp if you include this header from multiple files (compilation units)
 //
-    OneFileLF gOFLF{};
+    OneFileWF gOFWF{};
     thread_local OpData *tl_opdata{nullptr};
 // Global/singleton to hold all the thread registry functionality
     ThreadRegistry gThreadRegistry{};
@@ -976,4 +1220,4 @@ namespace poflf {
         gThreadRegistry.deregister_thread(tid);
     }
 }
-#endif //LOCKFREEC_ONEFILEPTMLF_H
+#endif //LOCKFREEC_ONEFILEPTMWF_H
