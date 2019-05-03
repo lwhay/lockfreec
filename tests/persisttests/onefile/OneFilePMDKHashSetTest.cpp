@@ -5,7 +5,7 @@
 
 #include <iostream>
 #include <sstream>
-#include "TMHashMap.h"
+#include "TMHashMapByRef.h"
 #include "PMDKTM.h"
 
 #define TOTAL_COUNT   (1 << 20)
@@ -28,13 +28,13 @@ uint64_t total_count = TOTAL_COUNT;
 
 int thread_number = THREAD_NUBMER;
 
-TMHashMap<uint64_t, uint64_t, pmdk::PMDKTM, pmdk::persist> *set;
+TMHashMapByRef<uint64_t, uint64_t, pmdk::PMDKTM, pmdk::persist> *set;
 
 stringstream *output;
 
 struct target {
     int tid;
-    TMHashMap<uint64_t, uint64_t, pmdk::PMDKTM, pmdk::persist> *set;
+    TMHashMapByRef<uint64_t, uint64_t, pmdk::PMDKTM, pmdk::persist> *set;
 };
 
 void simpleInsert() {
@@ -121,7 +121,10 @@ int main(int argc, char **argv) {
         total_count = atoi(argv[2]);
     }
     output = new stringstream[thread_number];
-    set = new TMHashMap<uint64_t, uint64_t, pmdk::PMDKTM, pmdk::persist>(thread_number);
+    //set = new TMHashMapByRef<uint64_t, uint64_t, pmdk::PMDKTM, pmdk::persist>(1000);
+    pmdk::PMDKTM::updateTx<bool>([&]() {
+        set = pmdk::PMDKTM::tmNew<TMHashMapByRef<uint64_t, uint64_t, pmdk::PMDKTM, pmdk::persist>>(1000);
+    });
     Tracer tracer;
     tracer.startTime();
     simpleInsert();
@@ -134,6 +137,8 @@ int main(int argc, char **argv) {
     for (int i = 0; i < total_count; i++) {
         set->remove(i);
     }
-    delete set;
+    pmdk::PMDKTM::updateTx<bool>([&]() {
+        pmdk::PMDKTM::tmDelete(set);
+    });
     delete[] output;
 }
