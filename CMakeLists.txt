@@ -277,6 +277,8 @@ if (WITH_PLF_TESTS)
             tests/persisttests/onefile/OneFileHashSetWFTest.cpp
             tests/persisttests/onefile/OneFilePHashSetLFTest.cpp
             tests/persisttests/onefile/OneFilePHashSetWFTest.cpp
+            tests/persisttests/onefile/RomulusLogPHashSetTest.cpp
+            tests/persisttests/onefile/RomulusLRPHashSetTest.cpp
             )
     if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 5.1 AND CMAKE_SYSTEM_NAME MATCHES "Linux")
         set(PMDK_LIBS "-L/usr/local/lib -lpmemobj")

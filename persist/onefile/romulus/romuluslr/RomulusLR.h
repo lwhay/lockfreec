@@ -24,7 +24,8 @@
 #include <thread>
 
 #include "../common/pfences.h"
-#include "../common/ThreadRegistry.hpp"
+#include "../common/ThreadRegistry.h"
+#include "tracer.h"
 
 /* <h1> Romulus using Left-Right plus flat-combining </h1>
  *
@@ -136,7 +137,11 @@ namespace romuluslr {
         static const int CHUNK_SIZE = 1024;
 
         // Filename for the mapping file
+#ifdef __APPLE__
+        const char *MMAP_FILENAME = "./romuluslr_shared";
+#else
         const char *MMAP_FILENAME = "/dev/shm/romuluslr_shared";
+#endif
 
         // Member variables
         bool dommap;
@@ -358,7 +363,6 @@ namespace romuluslr {
         }
 
         RomulusLR() : dommap{true}, maxThreads{128} {
-
             fc = new std::atomic<std::function<void()> *>[maxThreads * CLPAD];
             for (int i = 0; i < maxThreads; i++) {
                 fc[i * CLPAD].store(nullptr, std::memory_order_relaxed);
@@ -369,7 +373,6 @@ namespace romuluslr {
 
             }*/
         }
-
 
         ~RomulusLR() {
             delete[] fc;

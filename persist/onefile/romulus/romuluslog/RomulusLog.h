@@ -22,6 +22,7 @@
 #include "../common/pfences.h"
 #include "../common/ThreadRegistry.h"
 #include "../common/CRWWPSpinLock.h"
+#include "tracer.h"
 
 namespace romuluslog {
 
@@ -82,7 +83,11 @@ namespace romuluslog {
         static const int CLPAD = 128 / sizeof(uintptr_t);
 
         // Filename for the mapping file
+#ifdef __APPLE__
+        const char *MMAP_FILENAME = "./romuluslog_shared";
+#else
         const char *MMAP_FILENAME = "/dev/shm/romuluslog_shared";
+#endif
 
         // Each log entry is two words (8+8 = 16 bytes)
         struct LogEntry {

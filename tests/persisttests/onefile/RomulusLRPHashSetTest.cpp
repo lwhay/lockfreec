@@ -2,10 +2,14 @@
 // Created by Michael on 2019-05-04.
 //
 
+//
+// Created by Michael on 2019-05-04.
+//
+
 #include <iostream>
 #include <sstream>
 #include "TMHashMapByRef.h"
-#include "RomulusLog.h"
+#include "RomulusLR.h"
 
 #define TOTAL_COUNT   (1 << 20)
 
@@ -27,13 +31,13 @@ uint64_t total_count = TOTAL_COUNT;
 
 int thread_number = THREAD_NUBMER;
 
-TMHashMapByRef<uint64_t, uint64_t, romuluslog::RomulusLog, romuluslog::persist> *set;
+TMHashMapByRef<uint64_t, uint64_t, romuluslr::RomulusLR, romuluslr::persist> *set;
 
 stringstream *output;
 
 struct target {
     int tid;
-    TMHashMapByRef<uint64_t, uint64_t, romuluslog::RomulusLog, romuluslog::persist> *set;
+    TMHashMapByRef<uint64_t, uint64_t, romuluslr::RomulusLR, romuluslr::persist> *set;
 };
 
 void simpleInsert() {
@@ -121,8 +125,8 @@ int main(int argc, char **argv) {
     }
     output = new stringstream[thread_number];
     //set = new TMHashMapByRef<uint64_t, uint64_t, pmdk::PMDKTM, pmdk::persist>(1000);
-    romuluslog::RomulusLog::updateTx([&]() {
-        set = romuluslog::RomulusLog::tmNew<TMHashMapByRef<uint64_t, uint64_t, romuluslog::RomulusLog, romuluslog::persist>>(
+    romuluslr::RomulusLR::updateTx([&]() {
+        set = romuluslr::RomulusLR::tmNew<TMHashMapByRef<uint64_t, uint64_t, romuluslr::RomulusLR, romuluslr::persist>>(
                 1000);
     });
     Tracer tracer;
@@ -137,6 +141,6 @@ int main(int argc, char **argv) {
     for (int i = 0; i < total_count; i++) {
         set->remove(i);
     }
-    romuluslog::RomulusLog::updateTx([&]() { romuluslog::RomulusLog::tmDelete(set); });
+    romuluslr::RomulusLR::updateTx([&]() { romuluslr::RomulusLR::tmDelete(set); });
     delete[] output;
 }
