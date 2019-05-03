@@ -271,6 +271,12 @@ if (WITH_PLF_TESTS)
             tests/persisttests/onefile/OneFilePHashSetLFTest.cpp
             tests/persisttests/onefile/OneFilePHashSetWFTest.cpp
             )
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 5.1 AND CMAKE_SYSTEM_NAME MATCHES "Linux")
+        set(PM "-L/usr/local/lib -lpmemobj")
+        set(PLF_TESTS
+                tests/persisttests/onefile/OneFilePMDKHashSetTest.cpp
+                ${PLF_TESTS})
+    endif ()
 endif ()
 
 option(WITH_FOSTER_TESTS "build with foster tests" ON)
@@ -383,7 +389,7 @@ foreach (sourcefile ${LFQ_TESTS_EXES})
             EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
             OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
             )
-    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${Boost_LIBRARIES} ${PTHREAD} ${LTBB})
+    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${Boost_LIBRARIES} ${PTHREAD} ${LTBB} ${PM})
     #    if (NOT "${exename}" MATCHES "db_sanity_test")
     #        add_test(NAME ${exename} COMMAND ${exename}${ARTIFACT_SUFFIX})
     #        add_dependencies(check ${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX})
