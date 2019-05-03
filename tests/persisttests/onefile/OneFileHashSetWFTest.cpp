@@ -119,7 +119,9 @@ int main(int argc, char **argv) {
         total_count = atoi(argv[2]);
     }
     output = new stringstream[thread_number];
-    set = new OFWFResizableHashSet<uint64_t>(thread_number);
+    ofwf::OneFileWF::updateTx<bool>([&]() {
+        set = ofwf::OneFileWF::tmNew<OFWFResizableHashSet<uint64_t>>(thread_number, 1000);
+    });
     Tracer tracer;
     tracer.startTime();
     simpleInsert();
@@ -129,9 +131,6 @@ int main(int argc, char **argv) {
     long ut = tracer.getRunTime();
     cout << "IT " << it << " ut " << ut << " dupinst " << exists << " tryupd " << update << " failinst " << failure
          << " avgtpt " << (double) update * 1000000 * thread_number / total_time << endl;
-    for (int i = 0; i < total_count; i++) {
-        set->remove(i);
-    }
-    delete set;
+    ofwf::OneFileWF::updateTx<bool>([&]() { ofwf::OneFileWF::tmDelete(set); });
     delete[] output;
 }
