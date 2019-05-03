@@ -268,6 +268,12 @@ else ()
 endif ()
 
 if (WITH_PLF_TESTS)
+    set(PLF_LIBS
+            persist/onefile/romulus/common/ThreadRegistry.cpp
+            persist/onefile/romulus/romuluslr/RomulusLR.cpp
+            persist/onefile/romulus/romuluslr/malloc.cpp
+            persist/onefile/romulus/romuluslog/RomulusLog.cpp
+            persist/onefile/romulus/romuluslog/malloc.cpp)
     set(CMAKE_CXX_FLAGS "-DPWB_IS_CLFLUSHHARD ${CMAKE_CXX_FLAGS}")
     set(PLF_TESTS
             tests/persisttests/pqueue/MichaelScottQueueTest.cpp
@@ -422,7 +428,7 @@ endforeach (sourcefile ${FOSTER_TESTS_EXES})
 set(PERSIST_TESTS_EXES ${PLF_TESTS})
 foreach (sourcefile ${PERSIST_TESTS_EXES})
     get_filename_component(exename ${sourcefile} NAME_WE)
-    add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile} ${LF_LIBS})
+    add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile} ${PLF_LIBS})
     set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
             PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
             EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1

@@ -768,6 +768,19 @@ namespace romuluslr {
             gRomLR.ns_write_transaction(func);
         }
 
+        // TODO: Remove these two once we make CX have void transactions
+        template<typename R, class F>
+        inline static R readTx(F &&func) {
+            readTx([&]() { func(); });
+            return R{};
+        }
+
+        template<typename R, class F>
+        inline static R updateTx(F &&func) {
+            updateTx([&]() { func(); });
+            return R{};
+        }
+
         /*
          * Thread-safe. Compares the contents of 'main' and 'back'.
          * This method MUST be called outside a transaction.
