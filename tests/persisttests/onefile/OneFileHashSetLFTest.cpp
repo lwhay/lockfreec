@@ -36,6 +36,8 @@ OFLFResizableHashSet<uint64_t> *set;
 
 stringstream *output;
 
+atomic<int> stopMeasure(0);
+
 struct target {
     int tid;
     OFLFResizableHashSet<uint64_t> *set;
@@ -79,34 +81,36 @@ void *measureWorker(void *args) {
     //cout << "Updater " << work->tid << endl;
     uint64_t hit = 0;
     uint64_t fail = 0;
-    for (int i = work->tid; i < total_count; i += thread_number) {
+    while (stopMeasure.load(memory_order_relaxed) == 0) {
+        for (int i = work->tid; i < total_count; i += thread_number) {
 #if TEST_LOOKUP
 #if RANDOM_KEYS
-        if (work->set->contains(loads[i], work->tid)) {
+            if (work->set->contains(loads[i], work->tid)) {
 #else
-            if (work->set->contains(i, work->tid)) {
+                if (work->set->contains(i, work->tid)) {
 #endif
-            hit++;
-        } else {
-            fail++;
-        }
+                hit++;
+            } else {
+                fail++;
+            }
 #else
 #if RANDOM_KEYS
-        if (work->set->remove(loads[i], work->tid)) {
-            hit++;
-            if (!work->set->add(loads[i], work->tid)) {
-                fail++;
+            if (work->set->remove(loads[i], work->tid)) {
+                hit++;
+                if (!work->set->add(loads[i], work->tid)) {
+                    fail++;
+                }
             }
-        }
 #else
-        if (work->set->remove(i, work->tid)) {
-            hit++;
-            if (!work->set->add(i, work->tid)) {
-                fail++;
+            if (work->set->remove(i, work->tid)) {
+                hit++;
+                if (!work->set->add(i, work->tid)) {
+                    fail++;
+                }
             }
+#endif
+#endif
         }
-#endif
-#endif
     }
 
     long elipsed = tracer.getRunTime();
@@ -129,9 +133,15 @@ void multiWorkers() {
         pthread_join(workers[i], nullptr);
     }
     cout << "Measuring ..." << endl;
+    Timer timer;
+    timer.start();
     for (int i = 0; i < thread_number; i++) {
         pthread_create(&workers[i], nullptr, measureWorker, &parms[i]);
     }
+    while (timer.elapsedSeconds() < default_timer_range) {
+        sleep(1);
+    }
+    stopMeasure.store(1, memory_order_relaxed);
     for (int i = 0; i < thread_number; i++) {
         pthread_join(workers[i], nullptr);
         string outstr = output[i].str();
