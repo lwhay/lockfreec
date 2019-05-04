@@ -3,7 +3,9 @@
 #include <iostream>
 #include <random>
 #include <chrono>
+#include <fstream>
 #include <sys/time.h>
+#include <sys/stat.h>
 //#include <unistd.h>
 #include <math.h>
 
@@ -39,14 +41,30 @@ public:
     }
 };
 
+const char *existingFilePath = "./testfile.dat";
+
 template<typename R>
 class UniformGen {
+
 public:
+
     static inline void generate(R *array, size_t count) {
-        std::default_random_engine engine(static_cast<R>(chrono::steady_clock::now().time_since_epoch().count()));
-        std::uniform_int_distribution<size_t> dis(0, count + FUZZY_BOUND);
-        for (size_t i = 0; i < count; i++) {
-            array[i] = static_cast<R>(dis(engine));
+        struct stat buffer;
+        if (stat(existingFilePath, &buffer) == 0) {
+            cout << "read generation" << endl;
+            FILE *fp = fopen(existingFilePath, "rb+");
+            fread(array, sizeof(R), count, fp);
+            fclose(fp);
+        } else {
+            std::default_random_engine engine(static_cast<R>(chrono::steady_clock::now().time_since_epoch().count()));
+            std::uniform_int_distribution<size_t> dis(0, count + FUZZY_BOUND);
+            for (size_t i = 0; i < count; i++) {
+                array[i] = static_cast<R>(dis(engine));
+            }
+            FILE *fp = fopen(existingFilePath, "wb+");
+            fwrite(array, sizeof(R), count, fp);
+            fclose(fp);
+            cout << "write generation" << endl;
         }
     }
 };
