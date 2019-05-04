@@ -91,6 +91,7 @@ void *measureWorker(void *args) {
 #else
                 if (work->set->contains(i)) {
 #endif
+                hit++;
             } else {
                 fail++;
             }
