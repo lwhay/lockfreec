@@ -14,6 +14,12 @@
 
 #define TEST_LOOKUP   1
 
+#define RANDOM_KEYS   1
+
+#if RANDOM_KEYS
+uint64_t *loads;
+#endif
+
 long total_time;
 
 uint64_t exists = 0;
@@ -37,7 +43,11 @@ struct target {
 
 void simpleInsert() {
     for (int i = 0; i < total_count; i++) {
+#if RANDOM_KEYS
+        set->add(loads[i]);
+#else
         set->add(i);
+#endif
     }
     for (int i = 0; i < total_count; i += (total_count / QUERY_COUNT)) {
         cout << set->contains(i);
@@ -51,7 +61,11 @@ void *insertWorker(void *args) {
     struct target *work = (struct target *) args;
     uint64_t fail = 0;
     for (int i = work->tid; i < total_count; i += thread_number) {
-        if (!work->set->add(i, work->tid)) {
+#if RANDOM_KEYS
+        if (!work->set->add(loads[i], work->tid)) {
+#else
+            if (!work->set->add(i, work->tid)) {
+#endif
             fail++;
         }
     }
@@ -67,10 +81,22 @@ void *measureWorker(void *args) {
     uint64_t fail = 0;
     for (int i = work->tid; i < total_count; i += thread_number) {
 #if TEST_LOOKUP
-        if (work->set->contains(i, work->tid)) {
+#if RANDOM_KEYS
+        if (work->set->contains(loads[i], work->tid)) {
+#else
+            if (work->set->contains(i, work->tid)) {
+#endif
             hit++;
         } else {
             fail++;
+        }
+#else
+#if RANDOM_KEYS
+        if (work->set->remove(loads[i], work->tid)) {
+            hit++;
+            if (!work->set->add(loads[i], work->tid)) {
+                fail++;
+            }
         }
 #else
         if (work->set->remove(i, work->tid)) {
@@ -79,6 +105,7 @@ void *measureWorker(void *args) {
                 fail++;
             }
         }
+#endif
 #endif
     }
     long elipsed = tracer.getRunTime();
@@ -118,6 +145,10 @@ int main(int argc, char **argv) {
         thread_number = atoi(argv[1]);
         total_count = atoi(argv[2]);
     }
+#if RANDOM_KEYS
+    loads = new uint64_t[total_count];
+    UniformGen<uint64_t>::generate(loads, total_count);
+#endif
     output = new stringstream[thread_number];
     set = new OFWFResizableHashSet<uint64_t>(thread_number);
     Tracer tracer;
@@ -132,4 +163,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < total_count; i++) { set->remove(i); }
     delete set;
     delete[] output;
+#if RANDOM_KEYS
+    delete[] loads;
+#endif
 }
