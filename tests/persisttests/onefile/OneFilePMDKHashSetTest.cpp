@@ -2,7 +2,6 @@
 // Created by Michael on 2019-05-03.
 //
 
-
 #include <iostream>
 #include <sstream>
 #include "TMHashMapByRef.h"
@@ -15,6 +14,12 @@
 #define THREAD_NUBMER 4
 
 #define TEST_LOOKUP   1
+
+#define RANDOM_KEYS   1
+
+#if RANDOM_KEYS
+uint64_t *loads;
+#endif
 
 long total_time;
 
@@ -32,6 +37,8 @@ TMHashMapByRef<uint64_t, uint64_t, pmdk::PMDKTM, pmdk::persist> *set;
 
 stringstream *output;
 
+atomic<int> stopMeasure(0);
+
 struct target {
     int tid;
     TMHashMapByRef<uint64_t, uint64_t, pmdk::PMDKTM, pmdk::persist> *set;
@@ -39,7 +46,11 @@ struct target {
 
 void simpleInsert() {
     for (int i = 0; i < total_count; i++) {
+#if RANDOM_KEYS
+        set->add(loads[i]);
+#else
         set->add(i);
+#endif
     }
     for (int i = 0; i < total_count; i += (total_count / QUERY_COUNT)) {
         cout << set->contains(i);
@@ -53,7 +64,11 @@ void *insertWorker(void *args) {
     struct target *work = (struct target *) args;
     uint64_t fail = 0;
     for (int i = work->tid; i < total_count; i += thread_number) {
-        if (!work->set->add(i)) {
+#if RANDOM_KEYS
+        if (!work->set->add(loads[i])) {
+#else
+            if (!work->set->add(i)) {
+#endif
             fail++;
         }
     }
@@ -67,13 +82,26 @@ void *measureWorker(void *args) {
     //cout << "Updater " << work->tid << endl;
     uint64_t hit = 0;
     uint64_t fail = 0;
-    for (int i = work->tid; i < total_count; i += thread_number) {
+    while (stopMeasure.load(memory_order_relaxed) == 0) {
+        for (int i = work->tid; i < total_count; i += thread_number) {
 #if TEST_LOOKUP
-        if (work->set->contains(i)) {
-            hit++;
-        } else {
-            fail++;
-        }
+#if RANDOM_KEYS
+            if (work->set->contains(loads[i])) {
+#else
+                if (work->set->contains(i)) {
+#endif
+                hit++;
+            } else {
+                fail++;
+            }
+#else
+#if RANDOM_KEYS
+            if (work->set->remove(loads[i])) {
+                hit++;
+                if (!work->set->add(loads[i])) {
+                    fail++;
+                }
+            }
 #else
         if (work->set->remove(i)) {
             hit++;
@@ -82,7 +110,10 @@ void *measureWorker(void *args) {
             }
         }
 #endif
+#endif
+        }
     }
+
     long elipsed = tracer.getRunTime();
     output[work->tid] << work->tid << " " << elipsed << endl;
     __sync_fetch_and_add(&total_time, elipsed);
@@ -103,9 +134,15 @@ void multiWorkers() {
         pthread_join(workers[i], nullptr);
     }
     cout << "Measuring ..." << endl;
+    Timer timer;
+    timer.start();
     for (int i = 0; i < thread_number; i++) {
         pthread_create(&workers[i], nullptr, measureWorker, &parms[i]);
     }
+    while (timer.elapsedSeconds() < default_timer_range) {
+        sleep(1);
+    }
+    stopMeasure.store(1, memory_order_relaxed);
     for (int i = 0; i < thread_number; i++) {
         pthread_join(workers[i], nullptr);
         string outstr = output[i].str();
@@ -120,6 +157,10 @@ int main(int argc, char **argv) {
         thread_number = atoi(argv[1]);
         total_count = atoi(argv[2]);
     }
+#if RANDOM_KEYS
+    loads = new uint64_t[total_count];
+    UniformGen<uint64_t>::generate(loads, total_count);
+#endif
     output = new stringstream[thread_number];
     //set = new TMHashMapByRef<uint64_t, uint64_t, pmdk::PMDKTM, pmdk::persist>(1000);
     pmdk::PMDKTM::updateTx([&]() {
@@ -139,4 +180,7 @@ int main(int argc, char **argv) {
     }
     pmdk::PMDKTM::updateTx([&]() { pmdk::PMDKTM::tmDelete(set); });
     delete[] output;
+#if RANDOM_KEYS
+    delete[] loads;
+#endif
 }
