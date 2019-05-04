@@ -22,7 +22,6 @@
 #include "../common/pfences.h"
 #include "../common/ThreadRegistry.h"
 #include "../common/CRWWPSpinLock.h"
-#include "tracer.h"
 
 namespace romuluslog {
 

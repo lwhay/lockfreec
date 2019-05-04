@@ -25,7 +25,6 @@
 
 #include "../common/pfences.h"
 #include "../common/ThreadRegistry.h"
-#include "tracer.h"
 
 /* <h1> Romulus using Left-Right plus flat-combining </h1>
  *
