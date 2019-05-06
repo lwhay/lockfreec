@@ -34,11 +34,7 @@ uint64_t *loads;
 
 #include "OneFileLF.h"
 
-#if ISOLATION
-oflf::tmtype<uint64_t> value;
-#else
 oflf::tmtype<uint64_t> *value;
-#endif
 #elif (MEASURE_TYPE == 2)
 
 #include "OneFilePTMLF.h"
@@ -50,18 +46,30 @@ uint64_t ralue;
 
 stringstream *output;
 
-struct target {
-    int tid;
 #if (MEASURE_TYPE == 0)
 #if ISOLATION
+struct target : public oflf::tmbase {
+    int tid;
     oflf::tmtype<uint64_t> value;
 #else
-    oflf::tmtype<uint64_t> *value;
+    struct target {
+        int tid;
+        oflf::tmtype<uint64_t> *value;
+        /*uint64_t get() {
+            oflf::readTx([&] {
+                uint64_t ret = *value;
+                return ret;
+            });
+        }*/
 #endif
 #elif (MEASURE_TYPE == 2)
-    poflf::tmtype<uint64_t> *palue;
+    struct target {
+        int tid;
+        poflf::tmtype<uint64_t> *palue;
 #else
-    uint64_t *ralue;
+    struct target {
+        int tid;
+        uint64_t *ralue;
 #endif
 };
 
@@ -71,6 +79,8 @@ void *measureWorker(void *args) {
     struct target *work = (struct target *) args;
     uint64_t hit = 0;
     uint64_t fail = 0;
+    uint64_t tmp = 0;
+    int tid = work->tid;
     for (int i = work->tid; i < total_count; i++ /*+= thread_number*/) {
 #if (MEASURE_TYPE == 0)
 #if ISOLATION
@@ -78,18 +88,21 @@ void *measureWorker(void *args) {
         oflf::readTx([&]() { loads[i] = work->value; });
 #else
         //oflf::updateTx([&]() { *work->value = loads[i]; });
-        oflf::readTx([&]() { loads[i] = *work->value; });
+        oflf::readTx([&]() { tmp = *work->value; });
+        //tmp = work->get();
 #endif
         //work->value = loads[i];
 #elif (MEASURE_TYPE == 2)
-        poflf::updateTx([&]() { *work->palue = loads[i]; });
+        //poflf::updateTx([&]() { *work->palue = loads[i]; });
+        poflf::readTx([&]() { loads[i] = *work->palue; });
 #else
-        *work->ralue = loads[i];
+        //*work->ralue = loads[i];
+        loads[i] = *work->ralue;
 #endif
         hit++;
     }
     long elipsed = tracer.getRunTime();
-    output[work->tid] << work->tid << " " << elipsed << " " << endl;
+    output[tid] << tid << " " << elipsed << " " << endl;
     __sync_fetch_and_add(&total_time, elipsed);
     __sync_fetch_and_add(&update, hit);
     __sync_fetch_and_add(&failure, fail);
@@ -99,9 +112,10 @@ void multiWorkers() {
     pthread_t workers[thread_number];
 #if (MEASURE_TYPE == 0)
 #if ISOLATION
-    struct target *parms = (struct target *) oflf::tmMalloc(sizeof(struct target) * thread_number);
+    //struct target *parms = (struct target *) oflf::tmMalloc(sizeof(struct target) * thread_number);
+    struct target **parms = (struct target **) malloc(sizeof(struct target *) * thread_number);
 #else
-    struct target *parms = (struct target *) malloc(sizeof(struct target) * thread_number);
+    struct target **parms = (struct target **) malloc(sizeof(struct target *) * thread_number);
 #endif
 #elif (MEASURE_TYPE == 2)
     struct target *parms = (struct target *) malloc(sizeof(struct target) * thread_number);
@@ -113,17 +127,23 @@ void multiWorkers() {
     for (int i = 0; i < thread_number; i++) {
 #if (MEASURE_TYPE == 0)
         //oflf::updateTx([&] {
-        parms[i].tid = i;
 #if ISOLATION
+        parms[i] = oflf::tmNew<struct target>();
+        //parms[i] = new struct target;
+        parms[i]->tid = i;
+        //*parms[i]->value = (uint64_t) i;
+        //parms[i].value = (oflf::tmtype<uint64_t> *) oflf::tmMalloc(sizeof(oflf::tmtype<uint64_t>));
         //parms[i].value = value;
 #else
+        parms[i] = new struct target;
+        parms[i]->tid = i;
         /*parms[i].value = (oflf::tmtype<uint64_t> *) oflf::tmMalloc(
                 sizeof(oflf::tmtype<uint64_t>));*/
         //oflf::tmNew<oflf::tmtype<uint64_t>>();
-        parms[i].value = value;
+        parms[i]->value = value;
 #endif
         //});
-        pthread_create(&workers[i], nullptr, measureWorker, &parms[i]);
+        pthread_create(&workers[i], nullptr, measureWorker, parms[i]);
 #elif (MEASURE_TYPE == 2)
         //parms[i] = poflf::tmNew<struct target>();
         //poflf::updateTx([&] {
@@ -147,7 +167,8 @@ void multiWorkers() {
     cout << "Gathering ..." << endl;
 #if (MEASURE_TYPE == 0)
 #if ISOLATION
-    oflf::tmFree(parms);
+    //oflf::tmFree(parms);
+    delete[] parms;
 #else
     /*for (int i = 0; i < thread_number; i++) {
         oflf::tmFree(parms[i].value);
@@ -175,6 +196,7 @@ int main(int argc, char **argv) {
 #if (MEASURE_TYPE == 0)
 #if !ISOLATION
     value = (oflf::tmtype<uint64_t> *) oflf::tmMalloc(sizeof(oflf::tmtype<uint64_t>));
+    //value = oflf::tmNew<oflf::tmtype<uint64_t>>();
 #endif
 #endif
     Tracer tracer;
