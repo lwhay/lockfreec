@@ -10,7 +10,7 @@
 
 #define QUERY_COUNT   (1 << 7)
 
-#define THREAD_NUBMER 8
+#define THREAD_NUBMER 1
 
 #define MEASURE_TYPE  0 // 0: oflf, 2: poflf, 4: none
 
@@ -30,7 +30,7 @@ uint64_t *loads;
 
 // The two cases of oflf, saying MEASURE_TYPE == 0, are definitely correct.
 #if (MEASURE_TYPE == 0)
-#define ISOLATION  0
+#define ISOLATION  1
 
 #include "OneFileLF.h"
 
@@ -71,12 +71,14 @@ void *measureWorker(void *args) {
     struct target *work = (struct target *) args;
     uint64_t hit = 0;
     uint64_t fail = 0;
-    for (int i = work->tid; i < total_count; i++) {
+    for (int i = work->tid; i < total_count; i++ /*+= thread_number*/) {
 #if (MEASURE_TYPE == 0)
 #if ISOLATION
-        oflf::updateTx([&]() { work->value = loads[i]; });
+        //oflf::updateTx([&]() { work->value = loads[i]; });
+        oflf::readTx([&]() { loads[i] = work->value; });
 #else
-        oflf::updateTx([&]() { *work->value = loads[i]; });
+        //oflf::updateTx([&]() { *work->value = loads[i]; });
+        oflf::readTx([&]() { loads[i] = *work->value; });
 #endif
         //work->value = loads[i];
 #elif (MEASURE_TYPE == 2)
@@ -113,7 +115,7 @@ void multiWorkers() {
         //oflf::updateTx([&] {
         parms[i].tid = i;
 #if ISOLATION
-        parms[i].value = value;
+        //parms[i].value = value;
 #else
         /*parms[i].value = (oflf::tmtype<uint64_t> *) oflf::tmMalloc(
                 sizeof(oflf::tmtype<uint64_t>));*/
