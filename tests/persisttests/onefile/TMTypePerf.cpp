@@ -80,12 +80,20 @@ void *measureWorker(void *args) {
     uint64_t hit = 0;
     uint64_t fail = 0;
     uint64_t tmp = 0;
+    float sum = 0.1;
     int tid = work->tid;
     for (int i = work->tid; i < total_count; i++ /*+= thread_number*/) {
 #if (MEASURE_TYPE == 0)
 #if ISOLATION
         //oflf::updateTx([&]() { work->value = loads[i]; });
         oflf::readTx([&]() { loads[i] = work->value; });
+        for (int r = 0; r < 10; r++) {
+            float x = 0.1, y = 32.6;
+            sum += x * y;
+            if (sum > 1000000000.0f) {
+                sum = 0.1;
+            }
+        }
 #else
         //oflf::updateTx([&]() { *work->value = loads[i]; });
         oflf::readTx([&]() { tmp = *work->value; });
@@ -102,7 +110,7 @@ void *measureWorker(void *args) {
         hit++;
     }
     long elipsed = tracer.getRunTime();
-    output[tid] << tid << " " << elipsed << " " << endl;
+    output[tid] << tid << " " << elipsed << " " << sum << " " << endl;
     __sync_fetch_and_add(&total_time, elipsed);
     __sync_fetch_and_add(&update, hit);
     __sync_fetch_and_add(&failure, fail);
