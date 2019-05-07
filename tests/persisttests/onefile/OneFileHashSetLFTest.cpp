@@ -12,7 +12,7 @@
 
 #define THREAD_NUBMER 4
 
-#define TEST_LOOKUP   1
+#define TEST_LOOKUP   0
 
 long total_time;
 
