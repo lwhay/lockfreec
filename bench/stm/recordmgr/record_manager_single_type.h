@@ -188,8 +188,8 @@ public:
         COUTATOMIC(typeid(Record).name() << "_allocated_size=" << (allocatedBytes / 1000000.) << "MB" << std::endl);
         COUTATOMIC(typeid(Record).name() << "_recycled=" << recycled << std::endl);
         COUTATOMIC(typeid(Record).name() << "_deallocated=" << deallocated << std::endl);
-        COUTATOMIC(typeid(Record).name() << "_limbo_count=" << reclaim->getSizeString() << std::endl);
-        COUTATOMIC(typeid(Record).name() << "_limbo_details=" << reclaim->getDetailsString() << std::endl);
+        //COUTATOMIC(typeid(Record).name() << "_limbo_count=" << reclaim->getSizeString() << std::endl);
+        //COUTATOMIC(typeid(Record).name() << "_limbo_details=" << reclaim->getDetailsString() << std::endl);
         COUTATOMIC(typeid(Record).name() << "_pool_count=" << pool->getSizeString() << std::endl);
         COUTATOMIC(std::endl);
 
