@@ -14,6 +14,14 @@
 #include <cstring>
 #include <cstdint>   // Needed by uint64_t
 
+#define TRACE_STAGE
+
+#ifdef TRACE_STAGE
+
+#include "tracer.h"
+
+#endif
+
 // Please keep this file in sync (as much as possible) with ptms/POneFileLF.hpp
 
 namespace oflf {
@@ -358,7 +366,7 @@ namespace oflf {
             for (uint64_t i = 0; i < numStores; i++) {
                 // Use an heuristic to give each thread 8 consecutive DCAS to apply
                 WriteSetEntry &e = log[(tid * 8 + i) % numStores];
-                tmtypebase<uint64_t> *tmte = (tmtypebase<uint64_t> *) e.addr;
+                tmtypebase <uint64_t> *tmte = (tmtypebase <uint64_t> *) e.addr;
                 uint64_t lval = tmte->val.load(std::memory_order_acquire);
                 uint64_t lseq = tmte->seq.load(std::memory_order_acquire);
                 if (lseq < seq) DCAS((uint64_t *) e.addr, lval, lseq, e.val, seq);
@@ -412,6 +420,10 @@ namespace oflf {
     private:
         HazardErasOF he{};
         OpData *opData;
+#ifdef TRACE_STAGE
+        uint64_t *elipse;
+        Tracer *tracer;
+#endif
 
     public:
         /*static const*/ bool debug = false;
@@ -423,11 +435,46 @@ namespace oflf {
         OneFileLF() {
             opData = new OpData[REGISTRY_MAX_THREADS];
             writeSets = new WriteSet[REGISTRY_MAX_THREADS];
+#ifdef TRACE_STAGE
+            elipse = new uint64_t[REGISTRY_MAX_THREADS];
+            tracer = new Tracer[REGISTRY_MAX_THREADS];
+#endif
         }
 
         ~OneFileLF() {
             delete[] opData;
             delete[] writeSets;
+#ifdef TRACE_STAGE
+            delete[] elipse;
+            delete[] tracer;
+#endif
+        }
+
+        uint64_t stageTime(bool local = false) {
+            uint64_t retval = 0;
+#ifdef TRACE_STAGE
+            int curTid = (local) ? tl_tcico.tid : 0;
+            for (int i = curTid; local && i == curTid || !local && i < REGISTRY_MAX_THREADS; i++) {
+                retval += elipse[i];
+            }
+#endif
+            return retval;
+        }
+
+        uint64_t logCount(bool local = false) {
+            uint64_t count = 0;
+            int curTid = (local) ? tl_tcico.tid : 0;
+            for (int tid = curTid; local && tid == curTid || !local && tid < gThreadRegistry.getMaxThreads(); tid++) {
+                //cout << "\t\t-" << local << " " << tid << " " << count << endl;
+                for (int idx = 0; idx < writeSets[tid].numStores; idx++) {
+                    WriteSetEntry *next = &writeSets[tid].log[idx];
+                    while (next) {
+                        count++;
+                        next = next->next;
+                    }
+                }
+            }
+            return count;
         }
 
         static std::string className() { return "OneFileSTM-LF"; }
@@ -449,19 +496,6 @@ namespace oflf {
                 // Start over if there is already a new transaction
                 if (myopd.curTx == curTx.load(std::memory_order_acquire)) return;
             }
-        }
-
-        uint64_t logCount() {
-            int tid = tl_tcico.tid;
-            uint64_t count = 0;
-            for (int idx = 0; idx < writeSets[tid].numStores; idx++) {
-                WriteSetEntry *next = &writeSets[tid].log[idx];
-                while (next) {
-                    count++;
-                    next = next->next;
-                }
-            }
-            return count;
         }
 
         // Progress condition: wait-free population-oblivious
@@ -494,7 +528,13 @@ namespace oflf {
                 return false;
             }
             // Execute each store in the write-set using DCAS() and close the request
+#ifdef TRACE_STAGE
+            tracer[tid].startTime();
+#endif
             helpApply(newTx, tid);
+#ifdef TRACE_STAGE
+            elipse[tid] += tracer[tid].getRunTime();
+#endif
             retireRetiresFromLog(myopd, tid);
             myopd.numAllocs = 0;
             if (debug)
@@ -535,7 +575,13 @@ namespace oflf {
             const int tid = ThreadRegistry::getTID();
             OpData &myopd = opData[tid];
             if (myopd.nestedTrans > 0) {
+#ifdef TRACE_STAGE
+                tracer[tid].startTime();
+#endif
                 func();
+#ifdef TRACE_STAGE
+                elipse[tid] += tracer[tid].getRunTime();
+#endif
                 return;
             }
             ++myopd.nestedTrans;
@@ -543,7 +589,13 @@ namespace oflf {
             while (true) {
                 beginTx(myopd, tid);
                 try {
+#ifdef TRACE_STAGE
+                    tracer[tid].startTime();
+#endif
                     func();
+#ifdef TRACE_STAGE
+                    elipse[tid] += tracer[tid].getRunTime();
+#endif
                 } catch (AbortedTx &) {
                     continue;
                 }

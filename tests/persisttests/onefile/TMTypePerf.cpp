@@ -46,6 +46,8 @@ uint64_t ralue;
 
 stringstream *output;
 
+stringstream *logs;
+
 #if (MEASURE_TYPE == 0)
 #if ISOLATION
 struct target : public oflf::tmbase {
@@ -82,38 +84,38 @@ void *measureWorker(void *args) {
     uint64_t tmp = 0;
     float sum = 0.1;
     int tid = work->tid;
-    for (int i = work->tid; i < total_count; i++ /*+= thread_number*/) {
+    for (int r = 0; r < 100; r++) {
+        for (int i = 0/*work->tid*/; i < total_count; i++ /*+= thread_number*/) {
 #if (MEASURE_TYPE == 0)
 #if ISOLATION
-        oflf::updateTx([&]() {
-            fail++;
-            work->value = loads[i];
-        });
-        //oflf::readTx([&]() { loads[i] = work->value; });
-        /*for (int r = 0; r < 10; r++) {
-            float x = 0.1, y = 32.6;
-            sum += x * y;
-            if (sum > 1000000000.0f) {
-                sum = 0.1;
-            }
-        }*/
+            oflf::updateTx([&]() {
+                fail++;
+                work->value = loads[i];
+                //logs[tid] << "\t" << fail << " " << oflf::gOFLF.logCount(true) << " " << oflf::gOFLF.logCount() << endl;
+            });
+            //oflf::readTx([&]() { loads[i] = work->value; });
+            /*for (int r = 0; r < 10; r++) {
+                float x = 0.1, y = 32.6;
+                sum += x * y;
+                if (sum > 1000000000.0f) {
+                    sum = 0.1;
+                }
+            }*/
 #else
-        //oflf::updateTx([&]() { *work->value = loads[i]; });
-        oflf::readTx([&]() { tmp = *work->value; });
-        //tmp = work->get();
+            //oflf::updateTx([&]() { *work->value = loads[i]; });
+            oflf::readTx([&]() { tmp = *work->value; });
+            //tmp = work->get();
 #endif
-        //work->value = loads[i];
+            //work->value = loads[i];
 #elif (MEASURE_TYPE == 2)
-        //poflf::updateTx([&]() { *work->palue = loads[i]; });
-        poflf::readTx([&]() { loads[i] = *work->palue; });
-#else
-        //*work->ralue = loads[i];
-        loads[i] = *work->ralue;
+            //poflf::updateTx([&]() { *work->palue = loads[i]; });
+                        poflf::readTx([&]() { loads[i] = *work->palue; });
 #endif
-        hit++;
+            hit++;
+        }
     }
     long elipsed = tracer.getRunTime();
-    output[tid] << tid << " " << elipsed << " " << sum << " " << endl;
+    output[tid] << tid << " " << oflf::gOFLF.stageTime(true) << " " << elipsed << " " << sum << " " << fail << endl;
     __sync_fetch_and_add(&total_time, elipsed);
     __sync_fetch_and_add(&update, hit);
     __sync_fetch_and_add(&failure, fail);
@@ -173,6 +175,8 @@ void multiWorkers() {
         pthread_join(workers[i], nullptr);
         string outstr = output[i].str();
         cout << outstr;
+        outstr = logs[i].str();
+        cout << outstr;
     }
     //oflf::gOFLF.debug = false;
     cout << "Gathering ..." << endl;
@@ -200,6 +204,7 @@ int main(int argc, char **argv) {
         total_count = atoi(argv[2]);
     }
     output = new stringstream[thread_number];
+    logs = new stringstream[thread_number];
     loads = new uint64_t[total_count];
     for (int i = 0; i < total_count; i++) {
         loads[i] = i;
@@ -215,7 +220,8 @@ int main(int argc, char **argv) {
     multiWorkers();
     long ut = tracer.getRunTime();
     cout << "ut " << ut << " dupinst " << exists << " tryupd " << update << " failinst " << failure << " avgtpt "
-         << (double) update * 1000000 * thread_number / total_time << endl;
+         << (double) update * 1000000 * thread_number / total_time << " logcount " << oflf::gOFLF.logCount() << endl;
     delete[] loads;
     delete[] output;
+    delete[] logs;
 }
