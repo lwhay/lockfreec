@@ -37,6 +37,8 @@ uint64_t *loads;
 
 oflf::tmtype<uint64_t> *value[ATOMIC_UNIT];
 
+stringstream *logs;
+
 stringstream *output;
 
 struct target {
@@ -54,15 +56,17 @@ void *measureWorker(void *args) {
     Tracer tracer;
     tracer.startTime();
     struct target *work = (struct target *) args;
-    uint64_t hit = 0;
+    uint64_t hit = 0, trie = 0;
     uint64_t fail = 0;
     float sum = 0.1;
     int tid = work->tid;
     uint64_t final1 = 0, final2 = 0;
-    for (int i = work->tid; i < total_count; i++ /*+= thread_number*/) {
+    for (int i = 0; i < total_count; i++ /*+= thread_number*/) {
+        uint64_t trick = 0;
         oflf::updateTx([&]() {
             uint64_t tmp1 = *work->value[ATOMIC_FIRST];
             uint64_t tmp2 = *work->value[ATOMIC_SECOND];
+            //logs[tid] << "\t" << tid << " " << trie++ << " " << trick++ << " " << tmp1 << " " << tmp2 << endl;
             assert(tmp1 == tmp2);
             tmp1 += 1;
             *work->value[ATOMIC_FIRST] = tmp1;
@@ -102,6 +106,8 @@ void multiWorkers() {
         pthread_join(workers[i], nullptr);
         string outstr = output[i].str();
         cout << outstr;
+        outstr = logs[i].str();
+        cout << outstr;
     }
     oflf::gOFLF.debug = false;
     cout << "Gathering ..." << endl;
@@ -115,11 +121,12 @@ int main(int argc, char **argv) {
         total_count = atoi(argv[2]);
     }
     output = new stringstream[thread_number];
+    logs = new stringstream[thread_number];
     loads = new uint64_t[total_count];
     for (int i = 0; i < total_count; i++) {
         loads[i] = i;
     }
-    for (int i = 0; i < thread_number; i++) {
+    for (int i = 0; i < ATOMIC_UNIT; i++) {
         value[i] = (oflf::tmtype<uint64_t> *) oflf::tmMalloc(sizeof(oflf::tmtype<uint64_t>));
     }
     //value = oflf::tmNew<oflf::tmtype<uint64_t>>();
@@ -129,9 +136,10 @@ int main(int argc, char **argv) {
     long ut = tracer.getRunTime();
     cout << "ut " << ut << " dupinst " << exists << " tryupd " << update << " failinst " << failure << " avgtpt "
          << (double) update * 1000000 * thread_number / total_time << endl;
-    for (int i = 0; i < thread_number; i++) {
+    for (int i = 0; i < ATOMIC_UNIT; i++) {
         oflf::tmFree(value[i]);
     }
     delete[] loads;
     delete[] output;
+    delete[] logs;
 }
