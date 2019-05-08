@@ -64,6 +64,7 @@ void *measureWorker(void *args) {
     for (int i = 0; i < total_count; i++ /*+= thread_number*/) {
         uint64_t trick = 0;
         oflf::updateTx([&]() {
+            fail++;
             uint64_t tmp1 = *work->value[ATOMIC_FIRST];
             uint64_t tmp2 = *work->value[ATOMIC_SECOND];
             //logs[tid] << "\t" << tid << " " << trie++ << " " << trick++ << " " << tmp1 << " " << tmp2 << endl;

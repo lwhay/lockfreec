@@ -85,7 +85,10 @@ void *measureWorker(void *args) {
     for (int i = work->tid; i < total_count; i++ /*+= thread_number*/) {
 #if (MEASURE_TYPE == 0)
 #if ISOLATION
-        oflf::updateTx([&]() { work->value = loads[i]; });
+        oflf::updateTx([&]() {
+            fail++;
+            work->value = loads[i];
+        });
         //oflf::readTx([&]() { loads[i] = work->value; });
         /*for (int r = 0; r < 10; r++) {
             float x = 0.1, y = 32.6;
