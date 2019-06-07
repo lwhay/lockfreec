@@ -12,7 +12,7 @@ using namespace std;
 template<typename T>
 void unordered_map_func() {
     Tracer tracer;
-    for (int p = 20; p <= 26; p++) {
+    for (long p = 16; p <= 26; p++) {
         unordered_map<T, T> map;
         tracer.startTime();
         for (int i = 0; i < (1 << p); i++) {
@@ -26,7 +26,7 @@ void unordered_map_func() {
 template<typename T>
 void std_map_func() {
     Tracer tracer;
-    for (int p = 20; p <= 26; p++) {
+    for (long p = 16; p <= 26; p++) {
         map<T, T> map;
         tracer.startTime();
         for (int i = 0; i < (1 << p); i++) {
@@ -39,19 +39,19 @@ void std_map_func() {
 
 int main(int argc, char **argv) {
     cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@ int @@@@@@@@@@@@@@@@@@@@@@@@@@@" << endl;
-    for (int r = 0; r < 1; r++) {
+    for (int r = 0; r < 5; r++) {
         unordered_map_func<int>();
         std_map_func<int>();
         cout << "*****************************************************" << endl;
     }
     cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@ long @@@@@@@@@@@@@@@@@@@@@@@@@@" << endl;
-    for (int r = 0; r < 1; r++) {
+    for (int r = 0; r < 5; r++) {
         unordered_map_func<long>();
         std_map_func<long>();
         cout << "*****************************************************" << endl;
     }
     cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@ double @@@@@@@@@@@@@@@@@@@@@@@@" << endl;
-    for (int r = 0; r < 1; r++) {
+    for (int r = 0; r < 5; r++) {
         unordered_map_func<double>();
         std_map_func<double>();
         cout << "*****************************************************" << endl;
