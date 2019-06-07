@@ -15,11 +15,11 @@ void unordered_map_func() {
     for (long p = 16; p <= 26; p++) {
         unordered_map<T, T> map;
         tracer.startTime();
-        for (int i = 0; i < (1 << p); i++) {
+        for (int i = 0; i < (1LLU << p); i++) {
             map.insert(make_pair(static_cast<T>(i), static_cast<T>(i)));
         }
         long elipsed = tracer.getRunTime();
-        cout << "Uod Map: " << (1 << p) << " time: " << elipsed << " tpt: " << (double) (1 << p) / elipsed << endl;
+        cout << "Uod Map: " << (1LLU << p) << " time: " << elipsed << " tpt: " << (double) (1 << p) / elipsed << endl;
     }
 }
 
@@ -29,11 +29,11 @@ void std_map_func() {
     for (long p = 16; p <= 26; p++) {
         map<T, T> map;
         tracer.startTime();
-        for (int i = 0; i < (1 << p); i++) {
+        for (int i = 0; i < (1LLU << p); i++) {
             map.insert(make_pair(static_cast<T>(i), static_cast<T>(i)));
         }
         long elipsed = tracer.getRunTime();
-        cout << "Std Map: " << (1 << p) << " time: " << elipsed << " tpt: " << (double) (1 << p) / elipsed << endl;
+        cout << "Std Map: " << (1LLU << p) << " time: " << elipsed << " tpt: " << (double) (1 << p) / elipsed << endl;
     }
 }
 
