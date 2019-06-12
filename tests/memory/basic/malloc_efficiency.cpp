@@ -13,9 +13,7 @@
 
 #define THREAD_NUBMER 4
 
-#define TEST_LOOKUP   1
-
-#define RANDOM_KEYS   1
+size_t default_size = MALLOC_GRAN;
 
 long malloc_time;
 
@@ -33,6 +31,12 @@ stringstream *output;
 
 atomic<int> stopMeasure(0);
 
+size_t *size;
+
+int random_size = 1;
+
+double avgsize;
+
 struct target {
     int tid;
     char **mm;
@@ -48,7 +52,11 @@ void *measureWorker(void *args) {
     while (stopMeasure.load(memory_order_relaxed) == 0) {
         tracer.startTime();
         for (int i = 0; i < total_count / thread_number; i++) {
-            work->mm[i] = (char *) malloc(MALLOC_GRAN);
+            if (random_size) {
+                work->mm[i] = (char *) malloc(size[i]);
+            } else {
+                work->mm[i] = (char *) malloc(default_size);
+            }
             hit++;
         }
         malloc_elipsed += tracer.getRunTime();
@@ -71,7 +79,7 @@ void *measureWorker(void *args) {
 void multiWorkers() {
     pthread_t workers[thread_number];
     struct target parms[thread_number];
-    cout << "Measuring count: " << total_count << " thread: " << thread_number << " gran: " << MALLOC_GRAN << endl;
+    cout << "Measuring count: " << total_count << " thread: " << thread_number << " gran: " << avgsize << endl;
     Timer timer;
     timer.start();
     for (int i = 0; i < thread_number; i++) {
@@ -92,13 +100,33 @@ void multiWorkers() {
     cout << "Gathering ..." << endl;
 }
 
+void generate_size() {
+    avgsize = .0f;
+    size = (size_t *) malloc(sizeof(size_t) * total_count / thread_number);
+    UniformGen<size_t>::generate(size, total_count / thread_number, default_size * 2);
+    /*std::default_random_engine engine(static_cast<int>(chrono::steady_clock::now().time_since_epoch().count()));
+    std::uniform_int_distribution<size_t> dis(0, default_size * 2);*/
+    for (size_t i = 0; i < total_count / thread_number; i++) {
+        //size[i] = static_cast<size_t>(dis(engine));
+        avgsize += size[i];
+    }
+    avgsize /= (total_count / thread_number);
+}
+
 int main(int argc, char **argv) {
-    if (argc == 3) {
+    if (argc == 5) {
         cout << "Parameters " << argc << endl;
         thread_number = atoi(argv[1]);
         total_count = atoi(argv[2]);
+        random_size = atoi(argv[3]);
+        default_size = atoi(argv[4]);
+    } else if (argc != 1) {
+        cout << "Command thread_number total_count random_size default_size" << endl;
+        exit(0);
     }
+    avgsize = default_size;
     output = new stringstream[thread_number];
+    if (random_size == 1) generate_size();
     Tracer tracer;
     tracer.startTime();
     multiWorkers();

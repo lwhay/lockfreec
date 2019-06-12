@@ -370,7 +370,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
             set(JSUFIX "jemalloc")
             get_filename_component(exename ${sourcefile} NAME_WE)
             add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${JSUFIX} ${sourcefile})
-            set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
+            set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${JSUFIX}
                     PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
                     EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
                     EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
@@ -383,7 +383,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
             set(TSUFIX "tbbmalloc")
             get_filename_component(exename ${sourcefile} NAME_WE)
             add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${TSUFIX} ${sourcefile})
-            set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
+            set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${TSUFIX}
                     PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
                     EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
                     EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
@@ -394,18 +394,18 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
 
         set(CMAKE_CXX_FLAGS "-pthread -mrtm ${CMAKE_CXX_FLAGS}")
         foreach (sourcefile ${BASIC_MALLOC})
-            set(TSUFIX "supermalloc")
+            set(SSUFIX "supermalloc")
             set(SUPERMALLOC "-L./ -lsupermalloc -ldl")
             get_filename_component(exename ${sourcefile} NAME_WE)
-            add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${TSUFIX} ${sourcefile})
-            add_dependencies(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${TSUFIX} supermalloc)
-            set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
+            add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${SSUFIX} ${sourcefile})
+            add_dependencies(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${SSUFIX} supermalloc)
+            set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${SSUFIX}
                     PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
                     EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
                     EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
-                    OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}_${TSUFIX}
+                    OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}_${SSUFIX}
                     )
-            target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${TSUFIX} ${SUPERMALLOC} ${PTHREAD})
+            target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${SSUFIX} ${SUPERMALLOC} ${PTHREAD})
         endforeach (sourcefile ${BASIC_MALLOC})
     endif ()
 endif ()
