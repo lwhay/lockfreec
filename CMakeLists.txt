@@ -327,6 +327,10 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     option(MEM_COMP_TESTS "compare jemalloc libc supermalloc" ON)
 
     set(SUPER_MALLOC_LIB
+            ./memory/env.cpp
+            ./memory/footprint.cpp
+            ./memory/has_tsx.cpp
+            ./memory/makechunk.cpp
             ./memory/futex_mutex.cpp
             ./memory/bassert.cpp
             ./memory/malloc.cpp
@@ -387,11 +391,13 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
             target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${TSUFIX} ${LTBBMALLOC} ${PTHREAD})
         endforeach (sourcefile ${BASIC_MALLOC})
 
-        #[[foreach (sourcefile ${BASIC_MALLOC})
+        set(CMAKE_CXX_FLAGS "-pthread -mrtm ${CMAKE_CXX_FLAGS}")
+        foreach (sourcefile ${BASIC_MALLOC})
             set(TSUFIX "supermalloc")
-            set(SUPERMALLOC "-L./ -lsuppermalloc")
+            set(SUPERMALLOC "-L./ -lsupermalloc -ldl")
             get_filename_component(exename ${sourcefile} NAME_WE)
             add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${TSUFIX} ${sourcefile})
+            add_dependencies(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${TSUFIX} supermalloc)
             set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
                     PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
                     EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
@@ -399,7 +405,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
                     OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}_${TSUFIX}
                     )
             target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${TSUFIX} ${SUPERMALLOC} ${PTHREAD})
-        endforeach (sourcefile ${BASIC_MALLOC})]]
+        endforeach (sourcefile ${BASIC_MALLOC})
     endif ()
 endif ()
 
