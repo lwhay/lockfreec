@@ -26,15 +26,17 @@ endif ()
 if (NOT CMAKE_SYSTEM_NAME MATCHES "CYGWIN")
     find_package(tbb 1.0 REQUIRED COMPONENTS tbbmalloc tbb tbb_preview)
     if (NOT TBB_FIND_COMPONENTS EQUAL 0)
-        message("-- Found TBB at: ${TBB_DIR}")
+        message("-- Found TBB at: ${TBB_DIR} ${TBB_ROOT}")
         message("--   ${TBB_FIND_COMPONENTS} found at ${TBB_ROOT}")
         set(LTBB "-L${TBB_DIR}/../../ -ltbb")
+        set(LTBBMALLOC "-L${TBB_DIR}/../../ -ltbbmalloc")
     endif ()
 endif ()
 
 include_directories(.)
 include_directories(advance)
 include_directories(advance/hashfunc)
+include_directories(memory)
 include_directories(bench)
 include_directories(bench/cc)
 include_directories(bench/common)
@@ -171,7 +173,10 @@ endif ()
 if (CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "CYGWIN")
     message("TM built on ${CMAKE_SYSTEM_NAME}")
     set(DL "-ldl")
-    set(JEMALLOC "-ljemalloc")
+    execute_process(COMMAND jemalloc-config --libdir
+            OUTPUT_VARIABLE JEMALLOC_LIBDIR OUTPUT_STRIP_TRAILING_WHITESPACE)
+    set(JEMALLOC "-L${JEMALLOC_LIBDIR} -ljemalloc")
+    message(${JEMALLOC})
     set(URCU "-L../libs -lurcu")
     set(PAPI -lpapi)
     option(WITH_BROWN_LF "build with brown lockfree structures" ON)
@@ -315,6 +320,86 @@ if (WITH_FOSTER_TESTS)
                 sandbox/btree2sTest.c
                 sandbox/btree2sBulkInsert.c
                 )
+    endif ()
+endif ()
+
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    option(MEM_COMP_TESTS "compare jemalloc libc supermalloc" ON)
+
+    set(SUPER_MALLOC_LIB
+            ./memory/futex_mutex.cpp
+            ./memory/bassert.cpp
+            ./memory/malloc.cpp
+            ./memory/cache.cpp
+            ./memory/huge_malloc.cpp
+            ./memory/large_malloc.cpp
+            ./memory/small_malloc.cpp
+            ./memory/rng.cpp
+            ./memory/stats.cpp
+            ./memory/generated_constants.cpp
+            )
+
+    add_library(supermalloc SHARED ${SUPER_MALLOC_LIB})
+
+    set(CMAKE_EXE_LINKER_FLAGS "-L${JEMALLOC_LIBDIR} -Wl,-rpath,${JEMALLOC}")
+    message("${CMAKE_EXE_LINKER_FLAGS} ${JEMALLOC} ${LTBBMALLOC}")
+
+    set(BASIC_MALLOC
+            ./tests/memory/basic/malloc_basic.cpp
+            ./tests/memory/basic/malloc_efficiency.cpp)
+
+    if (MEM_COMP_TESTS)
+        foreach (sourcefile ${BASIC_MALLOC})
+            get_filename_component(exename ${sourcefile} NAME_WE)
+            add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile})
+            set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
+                    PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
+                    EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
+                    EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
+                    OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
+                    )
+            target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD})
+        endforeach (sourcefile ${BASIC_MALLOC})
+
+        foreach (sourcefile ${BASIC_MALLOC})
+            set(JSUFIX "jemalloc")
+            get_filename_component(exename ${sourcefile} NAME_WE)
+            add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${JSUFIX} ${sourcefile})
+            set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
+                    PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
+                    EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
+                    EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
+                    OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}_${JSUFIX}
+                    )
+            target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${JSUFIX} ${JEMALLOC} ${PTHREAD})
+        endforeach (sourcefile ${BASIC_MALLOC})
+
+        foreach (sourcefile ${BASIC_MALLOC})
+            set(TSUFIX "tbbmalloc")
+            get_filename_component(exename ${sourcefile} NAME_WE)
+            add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${TSUFIX} ${sourcefile})
+            set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
+                    PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
+                    EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
+                    EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
+                    OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}_${TSUFIX}
+                    )
+            target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${TSUFIX} ${LTBBMALLOC} ${PTHREAD})
+        endforeach (sourcefile ${BASIC_MALLOC})
+
+        #[[foreach (sourcefile ${BASIC_MALLOC})
+            set(TSUFIX "supermalloc")
+            set(SUPERMALLOC "-L./ -lsuppermalloc")
+            get_filename_component(exename ${sourcefile} NAME_WE)
+            add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${TSUFIX} ${sourcefile})
+            set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
+                    PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
+                    EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
+                    EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
+                    OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}_${TSUFIX}
+                    )
+            target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}_${TSUFIX} ${SUPERMALLOC} ${PTHREAD})
+        endforeach (sourcefile ${BASIC_MALLOC})]]
     endif ()
 endif ()
 
