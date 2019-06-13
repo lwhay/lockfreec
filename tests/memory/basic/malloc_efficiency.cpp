@@ -104,7 +104,9 @@ void *measureWorker(void *args) {
 void multiWorkers() {
     pthread_t workers[thread_number];
     struct target parms[thread_number];
-    cout << "Measuring count: " << total_count << " thread: " << thread_number << " gran: " << avgsize << endl;
+    cout << "Measuring count: " << total_count << " thread: " << thread_number << " type: " << random_size
+         << " (random type: " << (random_size & 0x1) << " permit write: " << (random_size & 0x2) << ") gran: "
+         << avgsize << endl;
     Timer timer;
     timer.start();
     for (int i = 0; i < thread_number; i++) {
