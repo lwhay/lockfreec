@@ -56,7 +56,7 @@ void *measureWorker(void *args) {
     long write_elipsed = 0;
     while (stopMeasure.load(memory_order_relaxed) == 0) {
         tracer.startTime();
-        if (random_size & 0x1 != 0) {
+        if ((random_size & 0x1) != 0) {
             for (int i = 0; i < total_count / thread_number; i++) {
                 work->mm[i] = (char *) malloc(size[i]);
                 hit++;
@@ -69,8 +69,8 @@ void *measureWorker(void *args) {
         }
         malloc_elipsed += tracer.getRunTime();
         tracer.startTime();
-        if (random_size & 0x2 != 0) {
-            if (random_size & 0x1 != 0) {
+        if ((random_size & 0x2) != 0) {
+            if ((random_size & 0x1) != 0) {
                 for (int i = 0; i < total_count / thread_number; i++) {
                     memset(work->mm[i], i, size[i]);
                     pin++;
@@ -154,7 +154,7 @@ int main(int argc, char **argv) {
     }
     avgsize = default_size;
     output = new stringstream[thread_number];
-    if (random_size & 0x1 != 0) generate_size();
+    if ((random_size & 0x1) != 0) generate_size();
     Tracer tracer;
     tracer.startTime();
     multiWorkers();
