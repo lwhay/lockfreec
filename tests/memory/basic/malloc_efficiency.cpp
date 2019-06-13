@@ -2,7 +2,6 @@
 // Created by lwh on 19-6-5.
 //
 
-
 #include <iostream>
 #include <sstream>
 #include "LFResizableHashSet.h"
@@ -18,6 +17,8 @@ size_t default_size = MALLOC_GRAN;
 long malloc_time;
 
 long free_time;
+
+long write_time;
 
 uint64_t malloc_count = 0;
 
@@ -49,17 +50,32 @@ void *measureWorker(void *args) {
     uint64_t fail = 0;
     long malloc_elipsed = 0;
     long free_elipsed = 0;
+    long write_elipsed = 0;
     while (stopMeasure.load(memory_order_relaxed) == 0) {
         tracer.startTime();
-        for (int i = 0; i < total_count / thread_number; i++) {
-            if (random_size) {
+        if (random_size & 0x1 != 0) {
+            for (int i = 0; i < total_count / thread_number; i++) {
                 work->mm[i] = (char *) malloc(size[i]);
-            } else {
-                work->mm[i] = (char *) malloc(default_size);
+                hit++;
             }
-            hit++;
+        } else {
+            for (int i = 0; i < total_count / thread_number; i++) {
+                work->mm[i] = (char *) malloc(default_size);
+                hit++;
+            }
         }
         malloc_elipsed += tracer.getRunTime();
+        tracer.startTime();
+        if (random_size & 0x2 != 0) {
+            for (int i = 0; i < total_count / thread_number; i++) {
+                memset(work->mm[i], i, size[i]);
+            }
+        } else {
+            for (int i = 0; i < total_count / thread_number; i++) {
+                memset(work->mm[i], i, default_size);
+            }
+        }
+        write_elipsed += tracer.getRunTime();
         tracer.startTime();
         for (int i = 0; i < total_count / thread_number; i++) {
             free(work->mm[i]);
@@ -71,6 +87,7 @@ void *measureWorker(void *args) {
                       << malloc_elipsed + free_elipsed << endl;
 
     __sync_fetch_and_add(&malloc_time, malloc_elipsed);
+    __sync_fetch_and_add(&write_time, write_elipsed);
     __sync_fetch_and_add(&free_time, free_elipsed);
     __sync_fetch_and_add(&malloc_count, hit);
     __sync_fetch_and_add(&free_count, fail);
@@ -121,12 +138,13 @@ int main(int argc, char **argv) {
         random_size = atoi(argv[3]);
         default_size = atoi(argv[4]);
     } else if (argc != 1) {
-        cout << "Command thread_number total_count random_size default_size" << endl;
+        cout << "Command thread_number total_count random_size default_size " << endl;
+        cout << "\t random_size: 0 (fixed nowrite), 1 (variant nowrite), 2 (fixed write), 3 (variant write)" << endl;
         exit(0);
     }
     avgsize = default_size;
     output = new stringstream[thread_number];
-    if (random_size == 1) generate_size();
+    if (random_size & 0x1 != 0) generate_size();
     Tracer tracer;
     tracer.startTime();
     multiWorkers();
@@ -134,6 +152,7 @@ int main(int argc, char **argv) {
     cout << " Total " << ut << " malloc count " << malloc_count << " free count " << free_count
          << " malloc avgtpt " << (double) malloc_count * 1000000 * thread_number / malloc_time
          << " free avgtpt " << (double) free_count * 1000000 * thread_number / free_time
-         << " total avgtpt " << (double) (malloc_count) * 1000000 * thread_number / (malloc_time + free_time) << endl;
+         << " total avgtpt " << (double) (malloc_count) * 1000000 * thread_number / (malloc_time + free_time)
+         << " write avgtpt " << (double) (malloc_count) * 1000000 * thread_number / (write_time) << endl;
     delete[] output;
 }
