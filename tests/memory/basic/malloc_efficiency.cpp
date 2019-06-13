@@ -78,6 +78,7 @@ void *measureWorker(void *args) {
             } else {
                 for (int i = 0; i < total_count / thread_number; i++) {
                     memset(work->mm[i], i, default_size);
+                    pin++;
                 }
             }
         }
