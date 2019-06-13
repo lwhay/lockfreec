@@ -24,6 +24,8 @@ uint64_t malloc_count = 0;
 
 uint64_t free_count = 0;
 
+uint64_t write_count = 0;
+
 uint64_t total_count = TOTAL_COUNT;
 
 int thread_number = THREAD_NUBMER;
@@ -47,6 +49,7 @@ void *measureWorker(void *args) {
     Tracer tracer;
     struct target *work = (struct target *) args;
     uint64_t hit = 0;
+    uint64_t pin = 0;
     uint64_t fail = 0;
     long malloc_elipsed = 0;
     long free_elipsed = 0;
@@ -67,12 +70,15 @@ void *measureWorker(void *args) {
         malloc_elipsed += tracer.getRunTime();
         tracer.startTime();
         if (random_size & 0x2 != 0) {
-            for (int i = 0; i < total_count / thread_number; i++) {
-                memset(work->mm[i], i, size[i]);
-            }
-        } else {
-            for (int i = 0; i < total_count / thread_number; i++) {
-                memset(work->mm[i], i, default_size);
+            if (random_size & 0x1 != 0) {
+                for (int i = 0; i < total_count / thread_number; i++) {
+                    memset(work->mm[i], i, size[i]);
+                    pin++;
+                }
+            } else {
+                for (int i = 0; i < total_count / thread_number; i++) {
+                    memset(work->mm[i], i, default_size);
+                }
             }
         }
         write_elipsed += tracer.getRunTime();
@@ -84,12 +90,13 @@ void *measureWorker(void *args) {
         free_elipsed += tracer.getRunTime();
     }
     output[work->tid] << work->tid << " " << malloc_elipsed << " " << free_elipsed << " "
-                      << malloc_elipsed + free_elipsed << endl;
+                      << malloc_elipsed + free_elipsed << " " << write_elipsed << endl;
 
     __sync_fetch_and_add(&malloc_time, malloc_elipsed);
     __sync_fetch_and_add(&write_time, write_elipsed);
     __sync_fetch_and_add(&free_time, free_elipsed);
     __sync_fetch_and_add(&malloc_count, hit);
+    __sync_fetch_and_add(&write_count, pin);
     __sync_fetch_and_add(&free_count, fail);
 }
 
@@ -153,6 +160,6 @@ int main(int argc, char **argv) {
          << " malloc avgtpt " << (double) malloc_count * 1000000 * thread_number / malloc_time
          << " free avgtpt " << (double) free_count * 1000000 * thread_number / free_time
          << " total avgtpt " << (double) (malloc_count) * 1000000 * thread_number / (malloc_time + free_time)
-         << " write avgtpt " << (double) (malloc_count) * 1000000 * thread_number / (write_time) << endl;
+         << " write avgtpt " << (double) (write_count) * 1000000 * thread_number / (write_time) << endl;
     delete[] output;
 }
