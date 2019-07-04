@@ -80,6 +80,7 @@ include_directories(misc)
 include_directories(persist)
 include_directories(persist/pqueue)
 include_directories(persist/onefile)
+include_directories(hash/mhash)
 
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     set(PTHREAD -lpthread)
@@ -255,6 +256,7 @@ option(WITH_LFQ_TESTS "build with tests" ON)
 if (WITH_LFQ_TESTS)
     set(LFQ_TESTS
             compare/boostlockfree.cpp
+            tests/hash/MH_MicroTest.cpp
             )
     if (NOT CMAKE_SYSTEM_NAME MATCHES "CYGWIN")
         set(LFQ_TESTS
