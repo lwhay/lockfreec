@@ -348,8 +348,10 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
 
     add_library(supermalloc SHARED ${SUPER_MALLOC_LIB})
 
-    set(CMAKE_EXE_LINKER_FLAGS "-L${JEMALLOC_LIBDIR} -Wl,-rpath,${JEMALLOC}")
-    message("${CMAKE_EXE_LINKER_FLAGS} ${JEMALLOC} ${LTBBMALLOC}")
+    if (USE_JEMALLOC)
+        set(CMAKE_EXE_LINKER_FLAGS "-L${JEMALLOC_LIBDIR} -Wl,-rpath,${JEMALLOC}")
+        message("${CMAKE_EXE_LINKER_FLAGS} ${JEMALLOC} ${LTBBMALLOC}")
+    endif ()
 
     set(BASIC_MALLOC
             ./tests/memory/basic/malloc_basic.cpp
