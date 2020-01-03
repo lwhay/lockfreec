@@ -204,6 +204,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux" OR CMAKE_SYSTEM_NAME MATCHES "CYGWIN")
                 bench/stm/brown/abtree_brown_rq_lf/brown_abtree_rq_lf_example.cpp
                 bench/stm/brown/abtree_brown_rq_lf/brown_abtree_rq_lf_perf.cpp
                 bench/stm/brown/bslack_brown_rq_lf/brown_bslack_example.cpp
+                bench/stm/brown/bslack_brown_rq_lf/brown_bslack_perf.cpp
                 bench/stm/brown/bst_brown_ist_lf/brown_ist_lf_perf.cpp
                 bench/stm/brown/bst_brown_rq_lf/brown_bst_rq_lf_example.cpp
                 bench/stm/brown/bst_brown_rq_lf/brown_bst_rq_lf_perf.cpp

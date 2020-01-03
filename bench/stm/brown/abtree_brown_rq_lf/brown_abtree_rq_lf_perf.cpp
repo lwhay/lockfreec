@@ -14,6 +14,9 @@
 #define MAX_ELEMENT_NUM (1 << TOTAL_ELEMENT_POWER)
 const int NUM_THREAD = TOTAL_THREAD_NUMBER;
 
+size_t total_count = MAX_ELEMENT_NUM;
+int threads_num = NUM_THREAD;
+
 typedef struct tree_struct {
     ds_adapter<int, void *> *tree;
     int tid;
@@ -37,6 +40,11 @@ void *insertWorker(void *args) {
 }
 
 int main(int argc, char **argv) {
+    if (argc > 2) {
+        total_count = std::atol(argv[1]);
+        threads_num = std::atoi(argv[2]);
+    }
+    std::cout << "total_count: " << total_count << " threads_num: " << threads_num << std::endl;
     const int KEY_RESERVED = std::numeric_limits<int>::min();
     const int unused1 = 0;
     void *const VALUE_RESERVED = NULL;
