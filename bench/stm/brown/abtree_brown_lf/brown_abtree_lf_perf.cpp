@@ -26,8 +26,8 @@ void *insertWorker(void *args) {
     treeStruct *ts = (treeStruct *) args;
     struct timeval begin;
     gettimeofday(&begin, nullptr);
-    for (int i = 0; i < (total_count / NUM_THREAD); i++) {
-        int key = i * NUM_THREAD + ts->tid;
+    for (int i = 0; i < (total_count / threads_num); i++) {
+        int key = i * threads_num + ts->tid;
         ts->tree->insertIfAbsent(ts->tid, key, (void *) key);
         if (i % (1 << NICE_PRINT_POWER) == 0) {
             struct timeval end;

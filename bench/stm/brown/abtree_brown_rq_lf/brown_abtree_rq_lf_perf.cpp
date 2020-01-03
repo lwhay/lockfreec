@@ -26,8 +26,8 @@ void *insertWorker(void *args) {
     treeStruct *ts = (treeStruct *) args;
     struct timeval begin;
     gettimeofday(&begin, nullptr);
-    for (int i = 0; i < (MAX_ELEMENT_NUM / NUM_THREAD); i++) {
-        int key = i * NUM_THREAD + ts->tid;
+    for (int i = 0; i < (total_count / threads_num); i++) {
+        int key = i * threads_num + ts->tid;
         ts->tree->insertIfAbsent(ts->tid, key, (void *) key);
         if (i % (1 << NICE_PRINT_POWER) == 0) {
             struct timeval end;
@@ -49,17 +49,17 @@ int main(int argc, char **argv) {
     const int unused1 = 0;
     void *const VALUE_RESERVED = NULL;
     RandomFNV1A *const unused2 = NULL;
-    auto tree = new ds_adapter<int, void *>(NUM_THREAD, KEY_RESERVED, unused1, VALUE_RESERVED, unused2);
+    auto tree = new ds_adapter<int, void *>(threads_num, KEY_RESERVED, unused1, VALUE_RESERVED, unused2);
 
-    pthread_t threads[NUM_THREAD];
-    treeStruct tids[NUM_THREAD];
-    for (int i = 0; i < NUM_THREAD; i++) {
+    pthread_t threads[threads_num];
+    treeStruct tids[threads_num];
+    for (int i = 0; i < threads_num; i++) {
         tids[i].tree = tree;
         tids[i].tid = i;
         tree->initThread(i);
         pthread_create(threads + i, NULL, insertWorker, tids + i);
     }
-    for (int i = 0; i < NUM_THREAD; i++) {
+    for (int i = 0; i < threads_num; i++) {
         pthread_join(threads[i], NULL);
     }
     tree->printSummary();
