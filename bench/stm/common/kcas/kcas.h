@@ -1,5 +1,7 @@
 #pragma once
 
+#include "dcss_plus.h"
+
 #define CASWORD_BITS_TYPE casword_t
 
 template<typename T>
