@@ -81,6 +81,8 @@ include_directories(persist)
 include_directories(persist/pqueue)
 include_directories(persist/onefile)
 include_directories(hash/mhash)
+include_directories(btree)
+include_directories(btree/bwtree)
 
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     set(PTHREAD -lpthread)
@@ -117,6 +119,12 @@ set(MWLF_LIBS
         mwcas/mmwcas.h
         mwcas/ebr.h
         mwcas/gc.h)
+
+set(BWTREE_LIBS
+        btree/bwtree/bwtree.cpp)
+
+set(BWTREE_TESTS
+        tests/btree/bwtree_unittest.cpp)
 
 enable_testing()
 option(WITH_UNIT_TESTS "build with unittest" ON)
@@ -524,3 +532,16 @@ foreach (sourcefile ${PERSIST_TESTS_EXES})
             )
     target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD} ${PMDK_LIBS})
 endforeach (sourcefile ${FOSTER_TESTS_EXES})
+
+set(BWTREE_TESTS_EXES ${BWTREE_TESTS})
+foreach (sourcefile ${BWTREE_TESTS_EXES})
+    get_filename_component(exename ${sourcefile} NAME_WE)
+    add_executable(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${sourcefile} ${BWTREE_LIBS})
+    set_target_properties(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX}
+            PROPERTIES EXCLUDE_FROM_DEFAULT_BUILD_RELEASE 1
+            EXCLUDE_FROM_DEFAULT_BUILD_MINRELEASE 1
+            EXCLUDE_FROM_DEFAULT_BUILD_RELWITHDEBINFO 1
+            OUTPUT_NAME ${exename}${ARTIFACT_SUFFIX}
+            )
+    target_link_libraries(${CMAKE_PROJECT_NAME}_${exename}${ARTIFACT_SUFFIX} ${PTHREAD} -latomic)
+endforeach (sourcefile ${BWTREE_TESTS_EXES})
