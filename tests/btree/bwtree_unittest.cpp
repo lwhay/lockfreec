@@ -40,7 +40,7 @@ public:
     //KeyEqualityChecker(const KeyEqualityChecker &p_key_eq_obj) = delete;
 };
 
-uint64_t total_count = (1llu << 27);
+uint64_t total_count = (1llu << 26);
 uint64_t thread_number = 1;
 
 void SingleTest() {
@@ -49,14 +49,22 @@ void SingleTest() {
     tree->AssignGCID(0);
     Tracer tracer;
     tracer.startTime();
-    for (int i = 0; i < total_count; i++) tree->Insert(i, i);
-    std::cout << total_count << " " << tracer.fetchTime() << " " << (double) total_count / tracer.fetchTime()
+    for (int i = 0; i < total_count; i++) {
+        tree->Insert(i, i);
+        Tracer it;
+        if (i % 10000000 == 0) {
+            it.startTime();
+            tree->PerformGC(0);
+            std::cout << "\t" << it.getRunTime() << std::endl;
+        }
+    }
+    std::cout << total_count << " " << tracer.fetchTime() << " " << ((double) total_count / tracer.fetchTime())
               << std::endl;
     delete tree;
 }
 
 void MultiTest() {
-    BwTree<uint64_t, uint64_t> *tree = new BwTree<uint64_t, uint64_t>();
+    BwTree<uint64_t, uint64_t> *tree = new BwTree<uint64_t, uint64_t>(true);
     tree->UpdateThreadLocal(thread_number);
     tree->AssignGCID(0);
     std::vector<std::thread> threads;
@@ -74,6 +82,6 @@ void MultiTest() {
 
 int main(int argc, char **argv) {
     SingleTest();
-//    MultiTest();
+    //MultiTest();
     return 0;
 }
