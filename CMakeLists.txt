@@ -120,6 +120,10 @@ set(MWLF_LIBS
         mwcas/ebr.h
         mwcas/gc.h)
 
+if (${CMAKE_BUILD_TYPE} STREQUAL "Release")
+    add_definitions(-DBWTREE_NODEBUG=1)
+endif ()
+
 set(BWTREE_LIBS
         btree/bwtree/bwtree.cpp)
 
