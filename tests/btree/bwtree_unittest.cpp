@@ -40,7 +40,7 @@ public:
     //KeyEqualityChecker(const KeyEqualityChecker &p_key_eq_obj) = delete;
 };
 
-uint64_t total_count = (1llu << 26);
+uint64_t total_count = (1llu << 20);
 uint64_t thread_number = 1;
 uint64_t duplicate = (1 << 3);
 
@@ -125,26 +125,73 @@ void SingleDuplicateTest() {
     delete tree;
 }
 
+atomic<long> total_time{0};
+atomic<long> total_tick{0};
+
 void MultiTest() {
-    BwTree<uint64_t, uint64_t> *tree = new BwTree<uint64_t, uint64_t>(true);
+    using treetype = BwTree<uint64_t, uint64_t, KeyComparator, KeyEqualityChecker>;
+    treetype *tree = new BwTree<uint64_t, uint64_t, KeyComparator, KeyEqualityChecker>(
+            true, KeyComparator{1}, KeyEqualityChecker{1});
     tree->UpdateThreadLocal(thread_number);
-    tree->AssignGCID(0);
     std::vector<std::thread> threads;
     for (size_t t = 0; t < thread_number; t++) {
         //tree->RegisterThread();
-        threads.push_back(std::thread([](BwTree<uint64_t, uint64_t> *tree, size_t tid) {
-            for (int i = tid; i < total_count; i += thread_number) tree->Insert(i, i);
+        threads.push_back(std::thread([](treetype *tree, size_t tid) {
+            Tracer tracer;
+            tracer.startTime();
+            tree->AssignGCID(tid);
+            long tick = 0;
+            for (uint64_t i = tid; i < total_count; i += thread_number) {
+                tree->Insert(i, i);
+                tick++;
+            }
+            total_time.fetch_add(tracer.getRunTime());
+            total_tick.fetch_add(tick);
         }, tree, t));
     }
     for (size_t t = 0; t < thread_number; t++) {
         threads[t].join();
+        tree->UnregisterThread(t);
     }
+    std::cout << "Insert: " << total_tick << " " << (total_time / thread_number) << " "
+              << (double) total_tick.load() * thread_number / total_time.load() << std::endl;
+
+    total_tick.store(0);
+    total_time.store(0);
+    threads.clear();
+    for (size_t t = 0; t < thread_number; t++) {
+        //tree->RegisterThread();
+        threads.push_back(std::thread([](treetype *tree, size_t tid) {
+            Tracer tracer;
+            tracer.startTime();
+            tree->AssignGCID(tid);
+            long tick = 0;
+            for (uint64_t i = tid; i < total_count; i += thread_number) {
+                std::vector<uint64_t> ret;
+                tree->GetValue(i, ret);
+                assert(ret[0] == i);
+                tick++;
+            }
+            total_time.fetch_add(tracer.getRunTime());
+            total_tick.fetch_add(tick);
+        }, tree, t));
+    }
+    for (size_t t = 0; t < thread_number; t++) {
+        threads[t].join();
+        tree->UnregisterThread(t);
+    }
+    std::cout << "Read: " << total_tick << " " << (total_time / thread_number) << " "
+              << (double) total_tick.load() * thread_number / total_time.load() << std::endl;
     delete tree;
 }
 
 int main(int argc, char **argv) {
     SingleUniqueTest();
     SingleDuplicateTest();
-    //MultiTest();
+    if (argc > 2) {
+        thread_number = std::atol(argv[1]);
+        total_count = std::atol(argv[2]);
+    }
+    MultiTest();
     return 0;
 }
