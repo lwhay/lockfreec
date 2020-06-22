@@ -216,7 +216,7 @@ void testDCAS() {
 int main(int argc, char **argv) {
     if (argc >= 2) {
         total_threads = atoi(argv[1]);
-        total_operations = atoi(argv[2]);
+        total_operations = atol(argv[2]);
     }
     testDCAS();
     return 0;
