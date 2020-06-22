@@ -110,8 +110,8 @@ void *dcasWorker(void *args) {
 #elif TEST_TYPE == 1
             local_others[tid * ALIGN_SIZE][LQ_POINTER] = target[LQ_POINTER];
             cas_result = __sync_val_compare_and_swap(&target[LQ_POINTER],
-                                                     local_points[tid * ALIGN_SIZE][LQ_POINTER],
-                                                     local_others[tid * ALIGN_SIZE][LQ_POINTER]);
+                                                     local_others[tid * ALIGN_SIZE][LQ_POINTER],
+                                                     local_points[tid * ALIGN_SIZE][LQ_POINTER]);
 #elif TEST_TYPE == 2
             local_others[tid * ALIGN_SIZE][LQ_POINTER] = target[LQ_POINTER];
             local_others[tid * ALIGN_SIZE][LQ_COUNTER] = target[LQ_COUNTER];
