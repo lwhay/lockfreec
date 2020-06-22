@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <thread>
 #include <random>
 #include "tracer.h"
 #include "lf_basic.h"
@@ -26,9 +27,9 @@ typedef unsigned long long int atom_t;
 #define TEST_DCAS   0
 #define TEST_OFDCAS 0*/
 
-#define TEST_TYPE   1 // 0: TEST_ADD, 1: TEST_CAS, 2: TEST_DCAS, 3: TEST_OFDCAS, 4: TEST_ACAS; 5: TO BE CONT.
+#define TEST_TYPE   3 // 0: TEST_ADD, 1: TEST_CAS, 2: TEST_DCAS, 3: TEST_OFDCAS, 4: TEST_ACAS; 5: TO BE CONT.
 
-#define SINGLETEST  0
+#define SINGLETEST  1
 
 #if TEST_TYPE == 3
 
@@ -88,11 +89,13 @@ void initPayload() {
 
 void *dcasWorker(void *args) {
     int tid = *((int *) args);
+    cout << tid << endl;
 #if TEST_TYPE == 1
     atom_t cas_result = 0;
 #else
     unsigned char cas_result = 0;
 #endif
+    atom_t dummy_type = 0;
     atom_t self_opers = 0;
     atom_t self_tries = 0;
     Tracer tracer;
@@ -120,8 +123,10 @@ void *dcasWorker(void *args) {
 #elif TEST_TYPE == 3
             local_others[tid * ALIGN_SIZE][LQ_POINTER] = target[LQ_POINTER];
             local_others[tid * ALIGN_SIZE][LQ_COUNTER] = target[LQ_COUNTER];
-            cas_result = DCAS(target, global_points[LQ_POINTER], global_points[LQ_COUNTER],
-                              local_others[tid * ALIGN_SIZE][LQ_POINTER], local_others[tid * ALIGN_SIZE][LQ_COUNTER]);
+            cas_result = DCAS(target, local_others[tid * ALIGN_SIZE][LQ_POINTER],
+                              local_others[tid * ALIGN_SIZE][LQ_COUNTER], local_points[tid * ALIGN_SIZE][LQ_POINTER],
+                              local_points[tid * ALIGN_SIZE][LQ_COUNTER]);
+            if (cas_result != 1) this_thread::yield();
 #endif
 #if PRINT_FAIL
             if (TEST_TYPE == 1 && (cas_result != local_points[tid* ALIGN_SIZE][LQ_POINTER]) || cas_result == 0) {
@@ -162,16 +167,16 @@ void *dcasWorker(void *args) {
         local_others[tid *
                      ALIGN_SIZE][LQ_COUNTER] += total_threads;//= (local_others[tid][LQ_COUNTER] + 1) % total_threads;
 #elif TEST_TYPE == 3
-        // For dcas, cas_result denotes whether an exchange operation has been sucessfully enforced by the current thread.
-    } while (cas_result == 0);
-    local_points[tid *
-                 ALIGN_SIZE][LQ_POINTER] += total_threads;//= (local_points[tid][LQ_POINTER] + 1) % total_threads;
-    local_points[tid *
-                 ALIGN_SIZE][LQ_COUNTER] += total_threads;//= (local_points[tid][LQ_COUNTER] + 1) % total_threads;
-    local_others[tid *
-                 ALIGN_SIZE][LQ_POINTER] += total_threads;//= (local_others[tid][LQ_POINTER] + 1) % total_threads;
-    local_others[tid *
-                 ALIGN_SIZE][LQ_COUNTER] += total_threads;//= (local_others[tid][LQ_COUNTER] + 1) % total_threads;
+            // For dcas, cas_result denotes whether an exchange operation has been sucessfully enforced by the current thread.
+        } while (cas_result == 0);
+        local_points[tid *
+                     ALIGN_SIZE][LQ_POINTER] += total_threads;//= (local_points[tid][LQ_POINTER] + 1) % total_threads;
+        local_points[tid *
+                     ALIGN_SIZE][LQ_COUNTER] += total_threads;//= (local_points[tid][LQ_COUNTER] + 1) % total_threads;
+        local_others[tid *
+                     ALIGN_SIZE][LQ_POINTER] += total_threads;//= (local_others[tid][LQ_POINTER] + 1) % total_threads;
+        local_others[tid *
+                     ALIGN_SIZE][LQ_COUNTER] += total_threads;//= (local_others[tid][LQ_COUNTER] + 1) % total_threads;
 #endif
         self_opers++;
     }
